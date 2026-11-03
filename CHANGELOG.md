@@ -7,6 +7,35 @@
 这一版的主题是**让门禁真的能拦住问题**，并修正会误导使用者的错误事实。
 首发版 1.0.0 的门禁存在多处「失败却返回成功」的缺陷。
 
+### 新增：2D 平台跳跃控制器（已在真机编译验证）
+
+补上 2D 轨道最后缺的一块：**有文档没代码**。
+
+- 新增 `PlatformerController2D.cs`：Rigidbody2D 方案，含
+  **Coyote Time**（离开平台 0.10s 内仍可跳）、**Jump Buffer**（落地前 0.10s 按跳有效）、
+  可变跳跃高度、`Physics2D.OverlapCircle` 地面检测、连续碰撞检测防穿地板。
+  这三个手感辅助件是"跳得粘不粘"的分水岭，缺了明显差。
+- `InputReader` 增加只读的 `JumpAction`：`JumpPerformed` 只报按下瞬间，
+  做"松手截断上升"时读不到持续态。
+
+### 修复：`--dimension 2d` 会生成编译不过的工程
+
+实测发现的真实缺陷：2D 模式虽然装了 `com.unity.2d.*`，但**仍然生成 3D 专用文件**。
+2D 项目通常不启用 Physics/AI 内置包，于是：
+
+```
+error CS1069: 'CharacterController' could not be found ...
+  forwarded to assembly 'UnityEngine.PhysicsModule' — Enable the built in package 'Physics'
+error CS1069: 'NavMeshAgent' ... 'UnityEngine.AIModule' — Enable the built in package 'AI'
+```
+
+现在脚手架按维度裁剪：2D 跳过 `FirstPersonController`/`PlayerLook`/`EnemyAI`/
+`EnemyPerception`/`Interactor` 等 7 个 3D 专用文件，3D 跳过 `PlatformerController2D`。
+两边都实测：2D 生成 17 个文件、3D 生成 22 个文件，互不污染。
+
+**真机验证**：2D 工程在 Unity 6000.0.84f1 编译**零错误**，
+产出 `G2D.dll`（36 KB）与 `G2D.Tests.dll`（5.6 KB）。
+
 ### 新增：8 类单页全部有完整范文
 
 此前只有场景页有范文，其余 7 类只有空模板，AI 填出来的质量明显低于场景页。

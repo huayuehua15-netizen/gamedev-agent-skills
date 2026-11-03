@@ -64,6 +64,7 @@ description: "让 AI 通过 MCP（或命令行）自主完成 Unity 3D 单机游
 ```
 1. 输入 InputReader（脚手架已生成）→ 场景里挂 Player，WASD/鼠标动起来
 2. 第一人称 PlayerLook + FirstPersonController（走、跑、跳、蹲、落地）
+   - 2D 项目改用 `PlatformerController2D`（`--dimension 2d` 时自动生成，3D 专用文件不会生成）
 3. 交互 Interactor + 门/拾取物（准星提示 UI 打通）
 4. HUD + 菜单面板栈（UIManager，ESC 暂停）
 5. 玩法系统：Health/背包/对话（按 GDD 取舍）
@@ -87,7 +88,7 @@ python scripts/new_gameplay.py --out "D:/MyProject/Assets/Game" --namespace MyGa
 |---|---|---|
 | Core | `PersistentSingleton` / `StateMachine` / `EventBus` / `GameManager` / `GameEvents` | 单例、状态机、事件总线、游戏流程（菜单/游戏/暂停/加载） |
 | Input | `InputReader` | 新 Input System 代码化封装，键鼠+手柄 |
-| Player | `FirstPersonController` / `PlayerLook` | CharacterController 移动、鼠标视角、跑跳蹲 |
+| Player | `FirstPersonController` / `PlayerLook` / **`PlatformerController2D`** | 3D：CharacterController 移动、鼠标视角、跑跳蹲。2D：Rigidbody2D 平台跳跃（含 coyote time / jump buffer / 可变跳跃高度） |
 | Interaction | `InteractableBase` / `Interactor` / `PickupItem` | 准星交互、拾取示例 |
 | Systems | `Health` / `Inventory` / `SaveSystem` / `DialogueRunner` / `ObjectPool` / `AudioManager` | 生命、背包、JSON 存档、线性对话、对象池、音频 |
 | AI | `EnemyAI` / `EnemyPerception` | NavMesh 巡逻/追击/攻击状态机 + 视锥感知 |

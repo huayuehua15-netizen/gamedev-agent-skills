@@ -31,6 +31,11 @@ namespace {{NS}}
         public event Action<bool> SprintChanged; // true=按下 false=松开
         public event Action<bool> CrouchChanged;
 
+        // 只读暴露跳跃动作，供需要"是否仍按住"语义的地方使用：
+        // JumpPerformed 只报告按下瞬间，做可变跳跃高度（松手截断上升）时读不到持续态。
+        // 返回 null 表示尚未 BuildActions，调用方必须判空。
+        public InputAction JumpAction => _jumpAction;
+
         private InputAction _moveAction;
         private InputAction _lookMouseAction;
         private InputAction _lookStickAction;

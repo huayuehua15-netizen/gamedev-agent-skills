@@ -221,12 +221,37 @@ def deterministic_guid(seed):
     return uuid.uuid5(uuid.NAMESPACE_URL, seed).hex
 
 
-def copy_tree(src, dst, namespace, replacements):
+# 维度专属文件：2D 项目不装 Physics/AI 模块，生成 3D 专用脚本会直接编译失败
+# （CharacterController → UnityEngine.PhysicsModule、NavMeshAgent → UnityEngine.AIModule，
+#  Unity 会报 CS1069 "type forwarded to assembly ... Enable the built in package"）。
+FILES_3D_ONLY = {
+    "Player/FirstPersonController.cs",
+    "Player/PlayerLook.cs",
+    "AI/EnemyAI.cs",
+    "AI/EnemyPerception.cs",
+    "Interaction/Interactor.cs",
+    "Interaction/InteractableBase.cs",
+    "Interaction/PickupItem.cs",
+}
+
+FILES_2D_ONLY = {
+    "Player/PlatformerController2D.cs",
+}
+
+
+def copy_tree(src, dst, namespace, replacements, dimension="3d"):
     for root, dirs, files in os.walk(src):
         rel = os.path.relpath(root, src)
         target_dir = dst if rel == "." else os.path.join(dst, rel)
         for name in files:
             if name.endswith(".meta"):
+                continue
+            rel_posix = os.path.relpath(os.path.join(root, name), src).replace("\\", "/")
+            if dimension == "2d" and rel_posix in FILES_3D_ONLY:
+                log("  [2D] 跳过 3D 专用文件：%s" % rel_posix)
+                continue
+            if dimension == "3d" and rel_posix in FILES_2D_ONLY:
+                log("  [3D] 跳过 2D 专用文件：%s" % rel_posix)
                 continue
             src_file = os.path.join(root, name)
             content = read_text(src_file)
@@ -321,7 +346,7 @@ def scaffold(out_path, namespace, with_tests, add_packages, editor_data,
     # 3. 复制 Game
     if os.path.isdir(game_target):
         warn("目标目录已存在：%s，将覆盖其中同名文件（不会删除其他文件）。" % game_target)
-    copy_tree(game_src, game_target, namespace, replacements)
+    copy_tree(game_src, game_target, namespace, replacements, dimension)
     write_meta_for(os.path.join(game_target, "Game.asmdef"), game_guid)
     log("Game 框架已写入：%s" % game_target)
 
@@ -329,7 +354,7 @@ def scaffold(out_path, namespace, with_tests, add_packages, editor_data,
     if with_tests:
         tests_src = os.path.join(TEMPLATE_ROOT, "Tests")
         tests_target = os.path.join(assets_root, TESTS_DIRNAME)
-        copy_tree(tests_src, tests_target, namespace, replacements)
+        copy_tree(tests_src, tests_target, namespace, replacements, dimension)
         write_meta_for(os.path.join(tests_target, "Game.Tests.asmdef"), tests_guid)
         log("测试程序集已写入：%s" % tests_target)
 
