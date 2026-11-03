@@ -91,7 +91,9 @@ game-dev-skills/
 ├── tools/
 │   ├── build.py                  # 生成各宿主产物到 dist/
 │   ├── install.py                # 跨平台安装器（Win/macOS/Linux）
-│   └── install.ps1               # Windows 安装器（等价）
+│   ├── install.ps1               # Windows 安装器（等价）
+│   ├── make_gate_screenshot.py   # 用真实门禁重生成 README 对比图
+│   └── validate_examples.py      # 校验范文覆盖模板章节、编号无悬空
 ├── tests/
 │   └── test_silhouette_gate.py   # 剪影门禁单元测试（不需要 Blender）
 └── plugins/
@@ -101,6 +103,7 @@ game-dev-skills/
     │       ├── SKILL.md
     │       ├── references/       # 00-12，按需读取
     │       ├── assets/templates/ # 12 类文档模板 + 单页模板
+    │       ├── assets/examples/  # 8 类单页的完整范文（每类 1 份）
     │       └── scripts/new_gdd.py
     ├── blender-modeling-craft/
     ├── unity-blender-mcp/

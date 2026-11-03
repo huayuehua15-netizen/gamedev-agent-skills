@@ -80,6 +80,11 @@ jobs:
           PY
         # PyYAML ships preinstalled on GitHub runners
 
+      - name: Examples match their templates
+        run: python tools/validate_examples.py
+        # Every example must cover each section of its template, and every
+        # TZ_/EV_/SC_/PR_ id it references must actually be defined.
+
       - name: Scaffolds produce valid output
         shell: bash
         run: |

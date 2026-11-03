@@ -10,7 +10,8 @@
    因为 Agent 会原样照抄。请附上权威来源链接。
 2. **让一个门禁真的能拦住问题**。附上"修复前放过 / 修复后拦住"的实测输出。
 3. **补 2D 或非 Unity 引擎的缺口**。当前 2D 与 Godot/Unreal 仍是薄的一层。
-4. 补充范文（本仓库只有场景单页有完整范例）。
+4. 补充或改进范文（目前 8 类单页各有 1 份完整范文，见 `assets/examples/`；
+   正缺的是**同类型的第二种写法**，例如非恐怖品类的关卡、非敌人类型的角色）。
 5. 文档排版、错别字。
 
 ## 提交前请自检
@@ -22,10 +23,13 @@ python -m compileall -q plugins tools tests
 # 2) 门禁数学单元测试（不需要 Blender）
 python tests/test_silhouette_gate.py
 
-# 3) 重新生成各宿主产物（改了 plugins/ 就必须跑）
+# 3) 范文必须覆盖其模板的全部章节，且引用的编号真实存在
+python tools/validate_examples.py
+
+# 4) 重新生成各宿主产物（改了 plugins/ 就必须跑）
 python tools/build.py
 
-# 4) 确认 dist/ 与 plugins/ 一致（dist/ 被 gitignore，但发布依赖它）
+# 5) 确认 dist/ 与 plugins/ 一致（dist/ 被 gitignore，但发布依赖它）
 ```
 
 如果你改了 Blender 脚本，**请用真实 Blender 跑一遍**，并在 PR 里贴出退出码：
@@ -62,6 +66,7 @@ echo "exit=$?"
 - [ ] `references/` 按需读取，不要求在 SKILL.md 里一次读完
 - [ ] 脚本有退出码语义，并在文档里写明需要 `--python-exit-code 1`
 - [ ] 至少一条可机器判定的验收项
+- [ ] 新增模板时**同步补一份范文**，并让 `python tools/validate_examples.py` 通过
 - [ ] 在 `README.md` 的技能表里登记
 - [ ] 跑过 `python tools/build.py`，`dist/` 产物正常
 
