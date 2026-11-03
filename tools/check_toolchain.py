@@ -1,4 +1,4 @@
-﻿"""Final quality gate: re-verify the whole shipped toolchain end to end.
+"""Final quality gate: re-verify the whole shipped toolchain end to end.
 
 Not a re-read of the code. Runs the actual gates on freshly built assets
 and asserts the exit codes and numbers the README promises.
@@ -75,30 +75,49 @@ bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0,0,0.45))
 u = bpy.context.object; u.scale = (2.5, 2.5, 2.5); u.rotation_euler = (0,0,math.radians(37))
 bpy.ops.wm.save_as_mainfile(filepath=tmp + "/unapplied.blend")
 
-# reference silhouette of the good crate, orthographic front
-clear()
-bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0,0,0.45))
-r = bpy.context.object; r.scale = (0.6, 0.6, 0.9)
-bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-sc = bpy.context.scene
-sc.render.engine = 'BLENDER_WORKBENCH'
-sc.render.film_transparent = True
-sc.render.resolution_x = sc.render.resolution_y = 512
-sc.render.image_settings.file_format = 'PNG'
-sc.render.image_settings.color_mode = 'RGBA'
-sh = sc.display.shading
-sh.light='FLAT'; sh.color_type='SINGLE'; sh.single_color=(1,1,1)
-sh.show_object_outline=False; sh.show_shadows=False
-cd = bpy.data.cameras.new('C'); cd.type='ORTHO'; cd.ortho_scale = 1.15
-cam = bpy.data.objects.new('C', cd); sc.collection.objects.link(cam)
-cam.location = (0, -5, 0.45); cam.rotation_euler = (math.radians(90), 0, 0)
-sc.camera = cam
-sc.render.filepath = tmp + "/ref.png"
-bpy.ops.render.render(write_still=True)
+# 参考剪影不再在这里渲染。
+# 早先这段用 bpy.ops.render.render 生成 ref.png，而 CI 的 ubuntu runner 缺
+# libEGL，渲染直接抛 "Couldn't open libEGL.so.1"，连 fixture 构建都失败，
+# 于是所有检查被误报为失败。参考图纯用 numpy 合成即可，不依赖 GL。
 print("BUILT")
 '''
 
 (TMP / "build.py").write_text(BUILD, encoding="utf-8")
+
+
+def make_reference_png(path):
+    """用 numpy 直接合成一张参考剪影，避免依赖 OpenGL。
+
+    剪影门禁只需要一张"纯色前景 + 透明背景"的 PNG。用渲染去生成它，
+    等于让一个本可以纯数学的步骤依赖 GPU，在无头 CI 上必挂。
+    """
+    import struct
+    import zlib
+
+    w = h = 512
+    # 中央一个宽高比 0.6:0.9 的实心矩形，模拟好箱子的正视图
+    bw, bh = int(w * 0.6 * 0.75), int(h * 0.9 * 0.75)
+    x0, y0 = (w - bw) // 2, (h - bh) // 2
+
+    rows = []
+    for y in range(h):
+        row = bytearray()
+        for x in range(w):
+            inside = x0 <= x < x0 + bw and y0 <= y < y0 + bh
+            row += b"\xff\xff\xff\xff" if inside else b"\x00\x00\x00\x00"
+        rows.append(bytes(row))
+
+    raw = b"".join(b"\x00" + r for r in rows)  # filter byte 0 per scanline
+
+    def chunk(tag, data):
+        return (struct.pack(">I", len(data)) + tag + data
+                + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
+
+    png = b"\x89PNG\r\n\x1a\n"
+    png += chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0))
+    png += chunk(b"IDAT", zlib.compress(raw, 9))
+    png += chunk(b"IEND", b"")
+    path.write_bytes(png)
 
 
 LAST = {}   # 最近一次子进程输出，失败时用于诊断
@@ -181,6 +200,10 @@ add(results, "topology: missing file exits 2", r.returncode == 2, f"exit={r.retu
 
 # Everything below drives a render, so it needs a GL context.
 if RENDER_OK:
+    # 参考图用 numpy 合成，不经过 Blender 渲染：
+    # 这是本检查唯一的"外部输入"，用渲染生成它会让整条链路依赖 GPU。
+    make_reference_png(TMP / "ref.png")
+
     # --- silhouette gate -------------------------------------------------
     r = run(GATE, [TMP / "good.blend", "--gate", "--stage", "final",
                    "--ref-front", TMP / "ref.png", "--outdir", TMP / "g1"])

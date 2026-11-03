@@ -57,9 +57,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Blender
+        # libegl1 / libgl1 / libgles2 给无 GPU 的 runner 提供软件 GL 路径。
+        # 缺了它们，bpy.ops.render.render() 直接报
+        # "Couldn't open libEGL.so.1"，渲染类检查全部不可用。
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender
+          sudo apt-get install -y blender libegl1 libgl1 libgles2
           blender --version | head -1
 
       - name: Install Python deps
