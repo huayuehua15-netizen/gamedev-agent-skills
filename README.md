@@ -1,5 +1,8 @@
 # game-dev-skills
 
+[![CI](https://github.com/huayuehua15-netizen/gamedev-agent-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/huayuehua15-netizen/gamedev-agent-skills/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 面向游戏开发的 AI 技能套件。四个技能，一个仓库，一套可执行的验收门禁。**3D 为主，2D 有专门的落地方案**（见下文「2D 支持边界」）。
 
 > 定位：让 AI 不做蠢事、交付能过检查的东西。
@@ -133,6 +136,17 @@ python tools/build.py          # 产物全部在 dist/
 ## 核心：验收门禁
 
 这套仓库里真正有价值的不是提示词，是**能被机器判定的那部分**。
+
+![剪影门禁：同一张参考图，两个模型，同一套判定](docs/images/silhouette-gate.png)
+
+上面这张图不是示意图。两行由**同一个脚本、同一张参考图**判定，数字是脚本返回的原值：
+
+| 模型 | IoU | 宽高比误差 | 阈值 | 结果 | 退出码 |
+|---|---|---|---|---|---|
+| 比例正确 | 0.9965 | 0.0017 | 5% | ✅ PASS | `0` |
+| 比例错误（压扁拉宽） | 0.3669 | 2.2990 | 5% | ❌ FAIL | `1` |
+
+眼睛看着"都像个箱子"，门禁不会。这就是它存在的意义。
 
 ```bash
 # `--python-exit-code 1` 不是可选参数！

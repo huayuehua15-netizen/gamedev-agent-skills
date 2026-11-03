@@ -1,0 +1,238 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------- 纯 Python
+  # 不依赖 Blender / Unity，跑得最快，任何环境都能绿。
+  python:
+    name: Python · tests & build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip numpy
+
+      - name: Byte-compile every script
+        run: python -m compileall -q plugins tools tests
+
+      - name: Gate math unit tests (no Blender required)
+        run: python tests/test_silhouette_gate.py
+
+      - name: Validate all JSON manifests
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          bad = []
+          for p in pathlib.Path(".").rglob("*.json"):
+              if ".git" in p.parts or "dist" in p.parts:
+                  continue
+              try:
+                  json.loads(p.read_text(encoding="utf-8"))
+              except Exception as e:
+                  bad.append(f"{p}: {e}")
+          if bad:
+              print("\n".join(bad))
+              sys.exit(1)
+          print("all JSON valid")
+          PY
+
+      - name: Validate SKILL.md frontmatter
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          import yaml
+          skills = sorted(pathlib.Path("plugins").rglob("SKILL.md"))
+          if len(skills) != 4:
+              print(f"expected 4 SKILL.md, found {len(skills)}")
+              sys.exit(1)
+          for p in skills:
+              text = p.read_text(encoding="utf-8")
+              m = re.match(r"^---\s*\n(.*?)\n---", text, re.S)
+              if not m:
+                  print(f"{p}: missing frontmatter"); sys.exit(1)
+              meta = yaml.safe_load(m.group(1))
+              for key in ("name", "description"):
+                  if not meta.get(key):
+                      print(f"{p}: missing {key}"); sys.exit(1)
+              if "English:" not in meta["description"]:
+                  print(f"{p}: description needs an English clause")
+                  sys.exit(1)
+              if "路径" not in text[:1500]:
+                  print(f"{p}: should state the path convention near the top")
+                  sys.exit(1)
+          print(f"{len(skills)} skills OK")
+          PY
+        # PyYAML ships preinstalled on GitHub runners
+
+      - name: Scaffolds produce valid output
+        shell: bash
+        run: |
+          set -e
+          TMPD="$(mktemp -d)"
+
+          # Unity gameplay scaffold: asmdefs must be parseable JSON
+          for dim in 3d 2d; do
+            P="$TMPD/u_$dim"
+            mkdir -p "$P/Assets" "$P/Packages"
+            printf '{"dependencies":{}}' > "$P/Packages/manifest.json"
+            python plugins/unity-gameplay-dev/skills/unity-gameplay-dev/scripts/new_gameplay.py \
+              --out "$P/Assets/Game" --namespace Game$dim --dimension $dim
+            python - "$P" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          for rel in ("Assets/Game/Game.asmdef", "Assets/Game.Tests/Game.Tests.asmdef"):
+              p = root / rel
+              json.loads(p.read_text(encoding="utf-8"))  # raises if trailing comma
+          print("asmdefs OK:", root.name)
+          PY
+          done
+
+          # 2D scaffold must actually add the 2D packages, 3D must not
+          python - "$TMPD" <<'PY'
+          import json, pathlib, sys
+          tmp = pathlib.Path(sys.argv[1])
+          d2 = json.loads((tmp / "u_2d/Packages/manifest.json").read_text(encoding="utf-8"))
+          d3 = json.loads((tmp / "u_3d/Packages/manifest.json").read_text(encoding="utf-8"))
+          assert "com.unity.2d.sprite" in d2["dependencies"], "2D scaffold missing 2D packages"
+          assert "com.unity.2d.sprite" not in d3["dependencies"], "3D scaffold should not add 2D"
+          print("2D/3D package split OK")
+          PY
+
+          # GDD scaffold: every engine must render with no placeholders left
+          for eng in unity unreal godot; do
+            python plugins/aaa-game-gdd/skills/aaa-game-gdd/scripts/new_gdd.py \
+              init --name "T$eng" --out "$TMPD/g_$eng" --engine $eng
+          done
+          python - "$TMPD" <<'PY'
+          import pathlib, re, sys
+          tmp = pathlib.Path(sys.argv[1])
+          for eng in ("unity", "unreal", "godot"):
+              p = tmp / f"g_{eng}" / f"T{eng}_GDD" / "11-技术与性能.md"
+              text = p.read_text(encoding="utf-8")
+              left = re.findall(r"\{\{[A-Z_]+\}\}", text)
+              assert not left, f"{eng}: unresolved placeholders {set(left)}"
+          # the three engine outputs must actually differ
+          a = (tmp / "g_unity" / "Tunity_GDD" / "11-技术与性能.md").read_text(encoding="utf-8")
+          b = (tmp / "g_godot" / "Tgodot_GDD" / "11-技术与性能.md").read_text(encoding="utf-8")
+          assert a != b, "--engine produces identical output; it is not wired through"
+          print("engine variants OK")
+          PY
+
+      - name: build.py runs and dist/ matches plugins/
+        shell: bash
+        run: |
+          set -e
+          python tools/build.py
+          python - <<'PY'
+          import hashlib, pathlib, sys
+          root = pathlib.Path(".")
+          bad = []
+          for d in ("aaa-game-gdd", "blender-modeling-craft",
+                    "unity-blender-mcp", "unity-gameplay-dev"):
+              src = root / "plugins" / d / "skills" / d
+              dst = root / "dist" / "skills" / d
+              if not dst.is_dir():
+                  bad.append(f"missing dist output for {d}"); continue
+              def digest(base):
+                  h = hashlib.sha256()
+                  for f in sorted(p for p in base.rglob("*")
+                                  if p.is_file() and "__pycache__" not in p.parts):
+                      h.update(f.relative_to(base).as_posix().encode())
+                      h.update(f.read_bytes())
+                  return h.hexdigest()
+              if digest(src) != digest(dst):
+                  bad.append(f"dist drift: {d}")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print("dist parity OK")
+          PY
+
+  # ---------------------------------------------------------------- 真 Blender
+  # 门禁的核心承诺是"退出码可信"，只有真跑 Blender 才能证明。
+  blender:
+    name: Blender · gate exit codes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          blender --version | head -1
+
+      - name: Gate exit codes are trustworthy
+        run: |
+          set -e
+          B=$(command -v blender)
+          RA=plugins/blender-modeling-craft/skills/blender-modeling-craft/scripts/topology_audit.py
+          QR=plugins/blender-modeling-craft/skills/blender-modeling-craft/scripts/qa_render.py
+          W=$(mktemp -d)
+
+          # fixtures
+          "$B" --background --factory-startup --python-exit-code 1 --python - <<PY
+          import bpy
+          def clear():
+              bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete()
+          clear()
+          bpy.ops.mesh.primitive_cube_add(size=1.0)
+          o = bpy.context.object; o.name = "Clean"
+          m = bpy.data.materials.new("M"); m.use_nodes = True
+          o.data.materials.append(m)
+          bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+          bpy.ops.uv.smart_project(); bpy.ops.object.mode_set(mode='OBJECT')
+          bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+          bpy.ops.wm.save_as_mainfile(filepath="$W/clean.blend")
+
+          clear()
+          bpy.ops.mesh.primitive_cube_add(size=1.0)
+          o = bpy.context.object; o.name = "Bad"; o.scale = (2, 2, 2)
+          bpy.ops.wm.save_as_mainfile(filepath="$W/bad.blend")
+          PY
+
+          echo "--- clean asset must exit 0 ---"
+          "$B" --background --factory-startup --python-exit-code 1 \
+            --python "$RA" -- "$W/clean.blend" --budget-tris 5000
+          test $? -eq 0
+
+          echo "--- unapplied scale must exit 1 ---"
+          set +e
+          "$B" --background --factory-startup --python-exit-code 1 \
+            --python "$RA" -- "$W/bad.blend" --budget-tris 5000
+          rc=$?
+          set -e
+          test $rc -eq 1 || { echo "expected 1, got $rc"; exit 1; }
+
+          echo "--- missing file must exit 2 ---"
+          set +e
+          "$B" --background --factory-startup --python-exit-code 1 \
+            --python "$RA" -- "$W/nope.blend"
+          rc=$?
+          set -e
+          test $rc -eq 2 || { echo "expected 2, got $rc"; exit 1; }
+
+          echo "--- a typo'd flag must not silently disable the gate ---"
+          set +e
+          "$B" --background --factory-startup --python-exit-code 1 \
+            --python "$QR" -- "$W/clean.blend" --gate=1
+          rc=$?
+          set -e
+          test $rc -eq 2 || { echo "expected 2, got $rc"; exit 1; }
+
+          echo "all gate exit codes correct"

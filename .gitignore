@@ -1,4 +1,4 @@
-dist/
+﻿dist/
 __pycache__/
 *.py[cod]
 *.pyo
@@ -8,3 +8,7 @@ qa_render/
 *.qa.json
 .venv/
 node_modules/
+
+# 临时 commit message（避免误提交）
+.cm*.txt
+*.commitmsg*.txt
