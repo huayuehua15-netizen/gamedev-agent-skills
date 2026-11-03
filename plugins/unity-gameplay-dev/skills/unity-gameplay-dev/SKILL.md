@@ -35,6 +35,8 @@ description: "让 AI 通过 MCP（或命令行）自主完成 Unity 3D 单机游
 
 1. **确认版本与管线**：`manage_editor` 读编辑器版本；项目 URP 还是 Built-in（材质和后处理不同）。
 2. **跑脚手架**：`python scripts/new_gameplay.py --out "<项目>/Assets/Game" --namespace <游戏名>`，生成框架代码、asmdef、测试程序集，并自动补 Input System 依赖；**打开一次 Unity 让包下载后再重跑一次**以回填 asmdef GUID。
+   - ⚠️ **首次编译报 `CS0234`/`CS0246`（找不到 `UnityEngine.InputSystem`）是预期行为**，不是脚手架坏了：全新项目还没下载包，读不到 InputSystem 的 asmdef GUID。打开一次 Unity 让包下载 → 重跑脚手架 → GUID 回填 → 再编译即零错误。
+   - 已在 Unity 6000.0.84f1 实测：重跑后编译零错误，`InventoryTests` 3/3 通过。
 3. **装场景引导对象**：按 `references/01` 建启动场景（GameManager、AudioManager、UIManager、EventSystem、Canvas），用 `manage_gameobject` / `manage_components`。
 4. **按功能顺序实现**：输入 → 第一人称控制器 → 交互 → HUD → 具体玩法系统 → AI → 音频/VFX（顺序见下「功能开发顺序」）。
 5. **逐功能验证**：每完成一个功能，Play 模式手测 + 写 EditMode/PlayMode 测试，见 `references/00` 的验证循环。

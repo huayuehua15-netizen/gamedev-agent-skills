@@ -204,6 +204,30 @@ python tests/test_silhouette_gate.py
 本仓库在 Blender 5.2.2 上实测：长宽比 1:1 / 2:1 / 5:1 / 10:1 / 20:1 / 40:1 自比全部通过；
 而对真实的形状错误（IoU 0.10 ~ 0.49）全部拒绝，无漏判。
 
+### Unity 模板的编译验证
+
+22 个 C# 模板已在**真实 Unity 6000.0.84f1** 中用 batchmode 编译验证：
+
+| 验证项 | 结果 |
+|---|---|
+| `GateTest.dll` / `GateTest.Tests.dll` 产出 | ✅ 45056 / 5632 bytes |
+| 编译错误 `CS####` | ✅ 0 |
+| `InventoryTests` EditMode 测试 | ✅ 3/3 通过 |
+
+复现方式（把 `<Unity>` 换成你的编辑器路径）：
+
+```bash
+python plugins/unity-gameplay-dev/skills/unity-gameplay-dev/scripts/new_gameplay.py \
+    --out "<项目>/Assets/Game" --namespace YourGame
+"<Unity>" -batchmode -quit -projectPath "<项目>" -logFile build.log -nographics
+grep "error CS" build.log          # 应该没有输出
+```
+
+> **首次运行会报 InputSystem 缺失，这是设计内的**：全新项目还没下载包，脚手架读不到
+> InputSystem 的 asmdef GUID。打开一次 Unity 让包下载，然后**重跑一次脚手架**回填 GUID，
+> 再编译即可（上面表格就是按这个流程验证的）。这是本仓库唯一"必须跑两次"的地方，
+> 已在 `unity-gameplay-dev/SKILL.md` 写明。
+
 ## 已知限制（请先读这段）
 
 1. 参考图必须是**正交**的正视图 / 侧视图剪影（透明底或纯色底、无透视、无投影、无渐变背景）。
@@ -211,8 +235,9 @@ python tests/test_silhouette_gate.py
 2. 剪影只能校验"外轮廓与比例"，校验不了细节、材质和气质。一只外观完全错误但轮廓正确的模型能通过。
 3. 模型自评一轮基本无效：多数运行环境里 agent 看不到渲染图。用脚本判定，别用"目测通过"。
 4. Unity 侧版本口径以 `unity-gameplay-dev` 为准（Unity 6 / 6000.x，新 Input System）。
-5. **C# 模板未在真实 Unity 编辑器中编译验证**。22 个模板做了 API 对照与结构检查，
-   但"可编译"这一条没有实证。介入真实项目前请先跑一次 `read_console` 确认。
+5. C# 模板已在 Unity **6000.0.84f1** 编译通过（零错误、3/3 测试通过），
+   但**未覆盖** 6000.3、内置渲染管线（Built-in）与其他平台的实际运行验证。
+   模板只保证"能编译、逻辑自洽"，不保证在你的具体项目配置下开箱即用。
 6. 极细长物体（长宽比 >40:1）仍可能因为像素采样不足而不稳定，这类资产请结合人工目检。
 7. 门禁只覆盖**几何与比例**。文件命名、材质正确性、授权合规不在自动检查范围内。
 8. 2D 不是"3D 换个相机"：物理、导航、预算模型都是另一套，见上文「2D 支持边界」。
