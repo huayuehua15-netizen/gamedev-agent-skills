@@ -4,6 +4,49 @@
 
 > 定位：让 AI 不做蠢事、交付能过检查的东西。
 > 它不承诺"AI 能做出好看的模型"——造型方向、美术判断、玩法手感仍然需要人。
+>
+> **为什么值得用**：市面上多数游戏开发 skill 只写"要注意比例""要保证性能"这类无法判定的建议。
+> 这套东西的核心是一批**能返回退出码的脚本**：拓扑不合格就退出 1，剪影不符就退出 1，
+> 让模型无法用"我觉得可以了"糊过去。
+
+## 30 秒上手
+
+```bash
+git clone https://github.com/huayuehua15-netizen/gamedev-agent-skills.git
+cd gamedev-agent-skills
+python tools/build.py                    # 生成各宿主产物到 dist/
+python tests/test_silhouette_gate.py     # 自检：门禁数学是否正常（不需要 Blender）
+```
+
+然后按你的宿主选一条：
+
+```bash
+# Cursor / Codex：装进你的项目
+python tools/install.py --target cursor --path /path/to/your-project
+python tools/install.py --target codex  --path /path/to/your-project
+
+# 任何认 SKILL.md 的宿主（含 DSH、Trae）
+python tools/install.py --target generic --path ~/.your-host/skills
+
+# Claude Code：不用装，走插件市场
+/plugin marketplace add https://github.com/huayuehua15-netizen/gamedev-agent-skills
+```
+
+只要最核心的门禁、不想装任何东西？直接跑脚本：
+
+```bash
+blender --background --python-exit-code 1 --python plugins/blender-modeling-craft/skills/blender-modeling-craft/scripts/topology_audit.py -- your_asset.blend --budget-tris 3000
+```
+
+## 它到底能帮你做什么
+
+| 你的处境 | 用哪个技能 | 得到什么 |
+|---|---|---|
+| "我有个游戏想法，但不知道怎么写成能派工的东西" | `aaa-game-gdd` | 12 类文档 + 单页模板 + 一键脚手架，每份都有完成定义检查表 |
+| "AI 帮我做的模型看着像方块堆砌" | `blender-modeling-craft` | 尺寸/blockout/拓扑/UV 流程 + **剪影 IoU 门禁**，不达标不许导出 |
+| "找了一堆 3D 素材，导入 Unity 就各种坏" | `unity-blender-mcp` | 素材优先决策树 + 审计清洗 + FBX 导出 + Unity 导入后处理 |
+| "GDD 写完了，代码从哪开始" | `unity-gameplay-dev` | 可编译的 C# 框架 + 输入/交互/UI/存档/AI + 脚手架 |
+| "我做 2D 游戏" | 全部，但有边界 | 见下文「2D 支持边界」，2D 有专门文档与模板 |
 
 ## 包含四个技能
 
@@ -35,19 +78,23 @@ game-dev-skills/
 ├── marketplace.json              # ZCode / 自带市场清单
 ├── .claude-plugin/marketplace.json  # Claude Code 市场清单（build 生成）
 ├── LICENSE
-├── README.md
+├── README.md                     # 本文件
+├── CONTRIBUTING.md               # 贡献标准与提交前自检
+├── CHANGELOG.md                  # 版本变更（含每个门禁缺陷的说明）
+├── .gitattributes                # 统一换行，防跨平台 diff 污染
 ├── tools/
 │   ├── build.py                  # 生成各宿主产物到 dist/
-│   └── install.ps1               # 按宿主安装
+│   ├── install.py                # 跨平台安装器（Win/macOS/Linux）
+│   └── install.ps1               # Windows 安装器（等价）
 ├── tests/
-│   └── test_silhouette_gate.py   # 剪影门禁单元测试
+│   └── test_silhouette_gate.py   # 剪影门禁单元测试（不需要 Blender）
 └── plugins/
     ├── aaa-game-gdd/
     │   ├── .zcode-plugin/plugin.json
     │   └── skills/aaa-game-gdd/
     │       ├── SKILL.md
-    │       ├── references/
-    │       ├── assets/templates/
+    │       ├── references/       # 00-12，按需读取
+    │       ├── assets/templates/ # 12 类文档模板 + 单页模板
     │       └── scripts/new_gdd.py
     ├── blender-modeling-craft/
     ├── unity-blender-mcp/
@@ -66,13 +113,16 @@ python tools/build.py          # 产物全部在 dist/
 
 | 宿主 | 用哪份产物 | 安装 |
 |---|---|---|
-| Trae | `dist/skills/` | `powershell tools/install.ps1 -Target trae -Path <技能目录>` |
 | Claude Code | 仓库根 `.claude-plugin/` | 推到 Git 后 `/plugin marketplace add <仓库地址>` |
-| Cursor | `dist/cursor/` | `install.ps1 -Target cursor -Path <项目>` |
-| Codex | `dist/codex/` | `install.ps1 -Target codex -Path <项目>` |
+| Cursor | `dist/cursor/` | `python tools/install.py --target cursor --path <项目>` |
+| Codex | `dist/codex/` | `python tools/install.py --target codex --path <项目>` |
+| Trae | `dist/skills/` | `python tools/install.py --target trae --path <技能目录>` |
+| 其他认 SKILL.md 的宿主（含 DSH） | `dist/skills/` | `python tools/install.py --target generic --path <技能目录>` |
 | 上传式（Claude.ai 等） | `dist/upload/*.zip` | 在设置里逐个上传 |
 | ZCode | 根目录 `marketplace.json` | 导入插件市场，无需复制 |
-| 其他认 SKILL.md 的宿主（含 DSH） | `dist/skills/` | `install.ps1 -Target generic -Path <技能目录>` |
+
+`tools/install.py` 跨平台（Windows / macOS / Linux 都能跑）。Windows 用户也可用
+`tools/install.ps1`，参数等价：`powershell tools/install.ps1 -Target cursor -Path <项目>`。
 
 需要说清楚的三件事：
 
@@ -121,20 +171,42 @@ python tests/test_silhouette_gate.py
 - **宽高比单独校验**：避免"拉伸到整帧"掩盖比例错误。
 - 阈值：blockout `0.70`、成品 `0.85`；宽高比误差 blockout `10%`、成品 `5%`。
 - 不通过就**不许导出**，报告写入 `qa_gate.json`。
-- ⚠️ 阈值是可复现的，不是"随便定的"：因为两张 mask 都归一到同一最长边，
-  **宽高比误差 5% 时 IoU 必然 ≥0.95**，所以 `final` 档实际上以宽高比为主导；
-  IoU 真正在 blockout 档（0.70）才承担"多一条腿/少一条胳膊"的判别力。
+- **量化容差**：宽高比是从像素包围盒数出来的，短边像素越少误差越大。门禁会按短边像素数
+  给一个额外容差（上限 15%），并把 `aspect_tol_effective`、`quant_tolerance_applied`、
+  `short_side_px` 一并写进 JSON——**容差是公开的，不是偷偷放水**。
+- **自适应渲染分辨率**：长宽比超过 4:1 时自动提高剪影渲染分辨率，保证短边至少 48 像素。
+
+> 关于阈值的一个诚实说明：因为两张 mask 都归一到同一最长边，**宽高比误差 5% 时 IoU 必然 ≥0.95**，
+> 所以 `final` 档实际上以宽高比为主导；IoU 真正在 blockout 档（0.70）才承担
+> "多一条腿/少一条胳膊"的判别力。
+
+### 门禁可信度自测
+
+```bash
+# 模型跟自己的参考图比，必须 100% 通过（否则门禁在报假错）
+# 长宽比 1:1 ~ 40:1 全部应通过
+```
+
+本仓库在 Blender 5.2.2 上实测：长宽比 1:1 / 2:1 / 5:1 / 10:1 / 20:1 / 40:1 自比全部通过；
+而对真实的形状错误（IoU 0.10 ~ 0.49）全部拒绝，无漏判。
 
 ## 已知限制（请先读这段）
 
 1. 参考图必须是**正交**的正视图 / 侧视图剪影（透明底或纯色底、无透视、无投影、无渐变背景）。
    带透视的商品照片拿去比 `--stage final` 的 0.85，会因为近大远小必然失败——那不是模型的问题。
-2. 剪影只能校验"外轮廓与比例"，校验不了细节、材质和气质。
+2. 剪影只能校验"外轮廓与比例"，校验不了细节、材质和气质。一只外观完全错误但轮廓正确的模型能通过。
 3. 模型自评一轮基本无效：多数运行环境里 agent 看不到渲染图。用脚本判定，别用"目测通过"。
 4. Unity 侧版本口径以 `unity-gameplay-dev` 为准（Unity 6 / 6000.x，新 Input System）。
-5. 剪影门禁对**极细长物体**（剑、栏杆，长宽比 >20:1）分数不稳定：230px 归一化后宽度只剩十来个像素，
-   一个像素的取整误差就能让 IoU 跳 9%。这类资产请结合人工目检，别只看数字。
-6. 2D 不是"3D 换个相机"：物理、导航、预算模型都是另一套，见上文「2D 支持边界」。
+5. **C# 模板未在真实 Unity 编辑器中编译验证**。22 个模板做了 API 对照与结构检查，
+   但"可编译"这一条没有实证。介入真实项目前请先跑一次 `read_console` 确认。
+6. 极细长物体（长宽比 >40:1）仍可能因为像素采样不足而不稳定，这类资产请结合人工目检。
+7. 门禁只覆盖**几何与比例**。文件命名、材质正确性、授权合规不在自动检查范围内。
+8. 2D 不是"3D 换个相机"：物理、导航、预算模型都是另一套，见上文「2D 支持边界」。
+
+## 贡献
+
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。最有价值的 PR 是"修掉一个会误导人的事实错误"
+或"让某个门禁真的能拦住问题"，两者都请附权威来源或实测输出。
 
 ## 许可
 

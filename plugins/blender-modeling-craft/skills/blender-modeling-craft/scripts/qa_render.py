@@ -37,6 +37,12 @@ from mathutils import Vector
 
 RENDER_RES = (1280, 720)
 SIL_RES = 512
+# 细长物体的剪影渲染分辨率：正交取景时物体长边撑满画面，短边只剩几个像素，
+# 再和参考图比宽高比就是拿量化噪声当结果（20:1 的剑宽度不足 10px）。
+# 长宽比超过 SIL_THIN_RATIO 时，把渲染分辨率按比例提高，保证短边至少 SIL_MIN_SHORT_PX 像素。
+SIL_THIN_RATIO = 4.0
+SIL_MIN_SHORT_PX = 48
+SIL_MAX_RES = 4096
 SAFE_MARGIN = 1.22
 ELEVATION = math.radians(22.0)
 AZIMUTHS = [35.0, 125.0, 215.0, 305.0]
@@ -249,14 +255,15 @@ def render_turntable(blend=None, outdir=None, target_name=None, collection_name=
 
 # ---------------------------------------------------------------- 剪影门禁
 
-def _setup_workbench(scene):
+def _setup_workbench(scene, res=None):
     """Workbench 单色 + 透明背景：得到不受材质/灯光影响的纯剪影。"""
     scene.render.engine = "BLENDER_WORKBENCH"
     scene.render.film_transparent = True
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"
-    scene.render.resolution_x = SIL_RES
-    scene.render.resolution_y = SIL_RES
+    res = int(res or SIL_RES)
+    scene.render.resolution_x = res
+    scene.render.resolution_y = res
     scene.render.resolution_percentage = 100
 
     shading = scene.display.shading
@@ -313,16 +320,35 @@ def _drop_camera(cam):
     bpy.data.cameras.remove(data)
 
 
+def _silhouette_res(lo, hi):
+    """按物体长宽比决定剪影渲染分辨率。
+
+    正交相机会让长边撑满画面。若长宽比很大（剑、栏杆），短边在固定分辨率下只有
+    几个像素，宽高比就变成取整噪声。这里保证短边至少 SIL_MIN_SHORT_PX 个像素。
+    """
+    size = hi - lo
+    dims = sorted([abs(size.x), abs(size.y), abs(size.z)], reverse=True)
+    longest, shortest = dims[0], max(dims[2], 1e-6)
+    if longest <= 0:
+        return SIL_RES
+    ratio = longest / shortest
+    if ratio <= SIL_THIN_RATIO:
+        return SIL_RES
+    need = int(math.ceil(SIL_MIN_SHORT_PX * ratio))
+    return int(min(max(SIL_RES, need), SIL_MAX_RES))
+
+
 def _render_silhouettes(targets, outdir):
     scene = bpy.context.scene
     prev_engine = scene.render.engine
     prev_transparent = scene.render.film_transparent
     lo, hi = _combined_bbox(targets)
+    res = _silhouette_res(lo, hi)
     hidden = _isolate(targets, keep_qa=False)
 
     paths = {}
     try:
-        _setup_workbench(scene)
+        _setup_workbench(scene, res)
         os.makedirs(outdir, exist_ok=True)
         for view in ("front", "side"):
             cam = _make_ortho_camera(view, lo, hi)
@@ -385,10 +411,14 @@ def _resize_nearest(mask, out_h, out_w):
     return mask[np.ix_(ys, xs)]
 
 
-def normalize_mask(mask, size=256, pad=0.05):
+def normalize_mask(mask, size=512, pad=0.05):
     """
     裁到包围盒 → 等比缩放到统一画布 → 居中。
     返回 (画布, 宽高比 w/h, 是否有效)。等比缩放是关键：拉伸会掩盖比例错误。
+
+    画布从 256 提到 512：归一化后最长边 = size*(1-2*pad)。细长物体（长宽比 20:1）
+    在 256 画布下短边只剩约 11 像素，一个像素的取整就是 9% 的误差——
+    会出现"模型跟自己的参考图比都不通过"的假阴性。
     """
     box = _bbox_of(mask)
     if box is None:
@@ -396,8 +426,7 @@ def normalize_mask(mask, size=256, pad=0.05):
     x0, y0, x1, y1 = box
     cropped = mask[y0:y1, x0:x1]
     h, w = cropped.shape
-    inner = max(1, int(round(size * (1.0 - 2.0 * pad)))
-                )
+    inner = max(1, int(round(size * (1.0 - 2.0 * pad))))
     scale = inner / float(max(h, w))
     nh = max(1, int(round(h * scale)))
     nw = max(1, int(round(w * scale)))
@@ -407,6 +436,8 @@ def normalize_mask(mask, size=256, pad=0.05):
     oy = (size - nh) // 2
     ox = (size - nw) // 2
     canvas[oy:oy + nh, ox:ox + nw] = small
+    # 宽高比用裁剪后的连续尺寸算，不要用取整后的 nh/nw ——
+    # 短边被取整到 11px 时，nh/nw 的误差可达 9%，会把好模型判死。
     return canvas, float(w) / float(h), True
 
 
@@ -433,7 +464,17 @@ def compare_view(view, render_mask, ref_mask, iou_min, aspect_tol):
 
     score = iou_score(canvas_r, canvas_ref)
     aspect_error = abs(aspect_r - aspect_ref) / aspect_ref
-    passed = score >= iou_min and aspect_error <= aspect_tol
+
+    # 量化容差：宽高比是从像素包围盒数出来的，短边像素越少，取整误差占比越大。
+    # 20:1 的物体短边只有十几个像素，1px 就是 5%~10% 的误差——这属于测量噪声，
+    # 不该判模型不合格。按"短边像素数"推一个额外的容差，并如实写进报告。
+    short_px = min(_short_side_px(render_mask), _short_side_px(ref_mask))
+    quant_tol = 0.0
+    if short_px and short_px < 200:
+        quant_tol = min(0.5 / float(short_px), 0.15)
+    effective_tol = aspect_tol + quant_tol
+
+    passed = score >= iou_min and aspect_error <= effective_tol
     return {
         "view": view,
         "pass": bool(passed),
@@ -441,7 +482,19 @@ def compare_view(view, render_mask, ref_mask, iou_min, aspect_tol):
         "aspect_render": round(aspect_r, 4),
         "aspect_ref": round(aspect_ref, 4),
         "aspect_error": round(aspect_error, 4),
+        "aspect_tol_effective": round(effective_tol, 4),
+        "quant_tolerance_applied": round(quant_tol, 4),
+        "short_side_px": short_px,
     }
+
+
+def _short_side_px(mask):
+    """包围盒短边像素数（用于估算宽高比的量化误差）。"""
+    box = _bbox_of(mask)
+    if box is None:
+        return 0
+    x0, y0, x1, y1 = box
+    return min(x1 - x0, y1 - y0)
 
 
 def silhouette_gate(targets, outdir, refs, stage="final", iou_min=None, aspect_tol=None):
