@@ -7,6 +7,14 @@ get stale skills. This runs the generator then compares hashes.
 Usage: python tools/check_dist.py
 """
 
+# --- UTF-8 输出守卫：Windows 控制台默认 cp1252/cp936，print 中文会抛 UnicodeEncodeError ---
+import sys as _sys
+for _s in (_sys.stdout, _sys.stderr):
+    if _s is not None and hasattr(_s, "reconfigure"):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 import hashlib
 import pathlib
 import subprocess

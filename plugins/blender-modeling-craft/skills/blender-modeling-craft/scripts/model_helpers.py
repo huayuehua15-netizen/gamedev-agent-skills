@@ -14,6 +14,14 @@ model_helpers.py — 建模前期与比例控制工具（Blender 5.x / 4.x 通�
 import bpy
 import math
 import sys
+# --- UTF-8 输出守卫：Windows 控制台默认 cp1252/cp936，print 中文会抛 UnicodeEncodeError ---
+import sys as _sys
+for _s in (_sys.stdout, _sys.stderr):
+    if _s is not None and hasattr(_s, "reconfigure"):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 import json
 
 # ---------------- 场景单位与集合 ----------------

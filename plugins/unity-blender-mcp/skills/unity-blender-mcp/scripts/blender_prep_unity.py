@@ -18,6 +18,14 @@ Blender 素材清洗 + Unity 标准 FBX 导出脚本（Unity + Blender MCP 管�
 
 import bpy
 import os
+# --- UTF-8 输出守卫：Windows 控制台默认 cp1252/cp936，print 中文会抛 UnicodeEncodeError ---
+import sys as _sys
+for _s in (_sys.stdout, _sys.stderr):
+    if _s is not None and hasattr(_s, "reconfigure"):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 import sys
 
 # 复用审计脚本的导入表（同目录），找不到时用本地兜底

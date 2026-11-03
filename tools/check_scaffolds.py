@@ -7,6 +7,14 @@ because the heredoc terminators were mis-indented inside the YAML block.
 Usage: python tools/check_scaffolds.py
 """
 
+# --- UTF-8 输出守卫：Windows 控制台默认 cp1252/cp936，print 中文会抛 UnicodeEncodeError ---
+import sys as _sys
+for _s in (_sys.stdout, _sys.stderr):
+    if _s is not None and hasattr(_s, "reconfigure"):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 import json
 import pathlib
 import re

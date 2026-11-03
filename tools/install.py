@@ -16,6 +16,14 @@ Windows 用户也可以用 tools/install.ps1；本脚本在 Windows / macOS / Li
 import argparse
 import shutil
 import sys
+# --- UTF-8 输出守卫：Windows 控制台默认 cp1252/cp936，print 中文会抛 UnicodeEncodeError ---
+import sys as _sys
+for _s in (_sys.stdout, _sys.stderr):
+    if _s is not None and hasattr(_s, "reconfigure"):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
