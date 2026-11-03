@@ -1,4 +1,4 @@
-"""Final quality gate: re-verify the whole shipped toolchain end to end.
+﻿"""Final quality gate: re-verify the whole shipped toolchain end to end.
 
 Not a re-read of the code. Runs the actual gates on freshly built assets
 and asserts the exit codes and numbers the README promises.
@@ -101,11 +101,24 @@ print("BUILT")
 (TMP / "build.py").write_text(BUILD, encoding="utf-8")
 
 
+LAST = {}   # 最近一次子进程输出，失败时用于诊断
+DETAIL = {}  # name -> 输出快照
+
+
 def run(script, args):
-    return subprocess.run(
+    r = subprocess.run(
         [BLENDER, "--background", "--factory-startup", "--python-exit-code", "1",
          "--python", str(script), "--"] + [str(a) for a in args],
         capture_output=True, text=True, encoding="utf-8", errors="replace")
+    LAST["stdout"] = r.stdout
+    LAST["stderr"] = r.stderr
+    return r
+
+
+def add(results, name, ok, detail):
+    """登记一项结果，并保存刚才那次子进程输出，供失败时打印。"""
+    results.append((name, ok, detail))
+    DETAIL[name] = dict(LAST)
 
 
 def jload(s):
@@ -158,13 +171,13 @@ results = []
 
 # --- topology gate -------------------------------------------------------
 r = run(TOPOLOGY, [TMP / "good.blend", "--budget-tris", "5000"])
-results.append(("topology: good asset passes", r.returncode == 0, f"exit={r.returncode}"))
+add(results, "topology: good asset passes", r.returncode == 0, f"exit={r.returncode}")
 
 r = run(TOPOLOGY, [TMP / "unapplied.blend", "--budget-tris", "5000"])
-results.append(("topology: unapplied transform rejected", r.returncode == 1, f"exit={r.returncode}"))
+add(results, "topology: unapplied transform rejected", r.returncode == 1, f"exit={r.returncode}")
 
 r = run(TOPOLOGY, [TMP / "nope.blend"])
-results.append(("topology: missing file exits 2", r.returncode == 2, f"exit={r.returncode}"))
+add(results, "topology: missing file exits 2", r.returncode == 2, f"exit={r.returncode}")
 
 # Everything below drives a render, so it needs a GL context.
 if RENDER_OK:
@@ -174,28 +187,27 @@ if RENDER_OK:
     d = jload(r.stdout)
     iou = d["views"][0]["iou"] if d and d.get("views") else None
     ok = r.returncode == 0 and iou is not None and iou >= 0.85
-    results.append(("silhouette: matching asset passes (IoU>=0.85)", ok, f"exit={r.returncode} iou={iou}"))
+    add(results, "silhouette: matching asset passes (IoU>=0.85)", ok, f"exit={r.returncode} iou={iou}")
 
     r = run(GATE, [TMP / "bad.blend", "--gate", "--stage", "final",
                    "--ref-front", TMP / "ref.png", "--outdir", TMP / "g2"])
     d = jload(r.stdout)
     iou = d["views"][0]["iou"] if d and d.get("views") else None
     ok = r.returncode == 1 and iou is not None and iou < 0.85
-    results.append(("silhouette: wrong proportions rejected", ok, f"exit={r.returncode} iou={iou}"))
+    add(results, "silhouette: wrong proportions rejected", ok, f"exit={r.returncode} iou={iou}")
 
     # --- turntable still works ------------------------------------------
     r = run(GATE, [TMP / "good.blend", "--outdir", TMP / "tt"])
     imgs = list((TMP / "tt").glob("*.png")) if (TMP / "tt").exists() else []
-    results.append(("turntable: renders 4 views", r.returncode == 0 and len(imgs) == 4,
-                    f"exit={r.returncode} images={len(imgs)}"))
+    add(results, "turntable: renders 4 views", r.returncode == 0 and len(imgs) == 4, f"exit={r.returncode} images={len(imgs)}")
 
 # 参数校验在解析阶段就该失败，不需要渲染出图，所以放在渲染开关之外——
 # 这样即使 CI 没有 GL 上下文，也能验证"拼错参数不会被静默忽略"。
 r = run(GATE, [TMP / "good.blend", "--gate=1"])
-results.append(("silhouette: typo'd flag exits 2 (no silent skip)", r.returncode == 2, f"exit={r.returncode}"))
+add(results, "silhouette: typo'd flag exits 2 (no silent skip)", r.returncode == 2, f"exit={r.returncode}")
 
 r = run(GATE, [TMP / "good.blend", "--stage", "blockuot"])
-results.append(("silhouette: misspelled stage errors", r.returncode == 2, f"exit={r.returncode}"))
+add(results, "silhouette: misspelled stage errors", r.returncode == 2, f"exit={r.returncode}")
 
 
 print()
@@ -213,3 +225,5 @@ print(f"{len(results) - fails}/{len(results)} passed")
 import shutil
 shutil.rmtree(TMP, ignore_errors=True)
 sys.exit(1 if fails else 0)
+
+
