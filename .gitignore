@@ -12,3 +12,8 @@ node_modules/
 # 临时 commit message（避免误提交）
 .cm*.txt
 *.commitmsg*.txt
+
+# 校验脚本的临时工作目录
+_scaffold*/
+_scaffold_*/
+_finalcheck/
