@@ -1,0 +1,37 @@
+name: BlenderDiag
+on:
+  push:
+    branches: [main]
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Blender
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y blender
+          echo "VERSION=$(blender --version | head -1)"
+          blender --version | head -3
+      - name: numpy
+        run: python3 -m pip install --quiet numpy
+      - name: BUILD fixtures only
+        run: |
+          mkdir -p /tmp/w
+          python3 - <<'PY'
+          import subprocess, pathlib, sys
+          print("python ok")
+          PY
+      - name: Run toolchain and capture
+        if: always()
+        run: |
+          export BLENDER=blender
+          python3 tools/check_toolchain.py > /tmp/out.txt 2>&1 || true
+          echo "===== OUTPUT ====="
+          cat /tmp/out.txt
+          echo "===== END ====="
+      - name: Show blender bpy smoke test
+        if: always()
+        run: |
+          blender --background --factory-startup --python-exit-code 1 --python-expr "import bpy; print('BPY OK', bpy.app.version_string); print('engines', [i.identifier for i in bpy.types.RenderSettings.bl_rna.properties['engine'].enum_items])" 2>&1 | tail -20
