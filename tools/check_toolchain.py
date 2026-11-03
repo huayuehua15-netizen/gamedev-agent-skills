@@ -148,23 +148,26 @@ def jload(s):
 
 
 def has_gl(tmpdir):
-    """CI 的 ubuntu runner 没有 GPU，Blender 的 Workbench/EEVEE 渲染需要一个
-    OpenGL 上下文，在那种环境下必然失败。这不是脚本缺陷，是环境限制。
-    用 BLENDER_SKIP_RENDER=1 或探测不到渲染能力时，只跑不依赖渲染的检查。
+    """检测本机能否真正渲染 Workbench 剪影。
 
-    探测本身要写到真实存在的目录：早先写成 '/tmp/_glprobe.png'，
-    在 Windows 上这个路径不存在，于是渲染"失败"，被误判成"没有 GPU"。
+    必须按真实使用条件探测：早先用 32x32 探测，在小图上通过了，
+    但真正的 512x512 剪影渲染仍然失败（CI 的 runner 上正是如此），
+    于是探测结果与后续检查不一致，报出一堆无意义的 FAIL。
+    现在按门禁实际用的分辨率和色深探测，并检查 PNG 是否真的落盘。
     """
     if os.environ.get("BLENDER_SKIP_RENDER") == "1":
         return False
-    probe_png = str(Path(tmpdir) / "_glprobe.png").replace("\\", "/")
+    out = str(Path(tmpdir) / "_glprobe.png").replace("\\", "/")
     probe = (
         "import bpy\n"
         "try:\n"
         "    s = bpy.context.scene\n"
         "    s.render.engine = 'BLENDER_WORKBENCH'\n"
-        "    s.render.resolution_x = s.render.resolution_y = 32\n"
-        f"    s.render.filepath = {probe_png!r}\n"
+        "    s.render.film_transparent = True\n"
+        "    s.render.resolution_x = s.render.resolution_y = 512\n"
+        "    s.render.image_settings.file_format = 'PNG'\n"
+        "    s.render.image_settings.color_mode = 'RGBA'\n"
+        f"    s.render.filepath = {out!r}\n"
         "    bpy.ops.render.render(write_still=True)\n"
         "    print('GL_OK')\n"
         "except Exception as e:\n"
@@ -174,7 +177,10 @@ def has_gl(tmpdir):
         [BLENDER, "--background", "--factory-startup", "--python-exit-code", "0",
          "--python-expr", probe],
         capture_output=True, text=True, encoding="utf-8", errors="replace")
-    return "GL_OK" in r.stdout
+    if "GL_OK" not in r.stdout:
+        return False
+    # 能渲染不代表能存盘，两头都要确认。
+    return (Path(tmpdir) / "_glprobe.png").exists()
 
 
 RENDER_OK = has_gl(TMP)
