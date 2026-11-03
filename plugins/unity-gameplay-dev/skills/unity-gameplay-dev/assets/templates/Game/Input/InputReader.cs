@@ -12,6 +12,10 @@ namespace {{NS}}
 {
     public class InputReader : MonoBehaviour
     {
+        // 全场唯一的输入源：GameManager 等系统需要直接订阅 PausePerformed 之类的事件，
+        // 没有这个入口就只能靠 Inspector 各自拖引用，容易漏接。
+        public static InputReader Instance { get; private set; }
+
         // 持续量：轮询
         public Vector2 Move { get; private set; }
         // 视角来源必须分开：鼠标 delta 的单位是像素/帧，摇杆是 -1..1，
@@ -39,6 +43,7 @@ namespace {{NS}}
 
         private void Awake()
         {
+            Instance = this;
             BuildActions();
         }
 

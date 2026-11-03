@@ -37,6 +37,15 @@ INPUT_PACKAGE = "com.unity.inputsystem"
 UGUI_PACKAGE = "com.unity.ugui"
 TEST_PACKAGE = "com.unity.test-framework"
 NUNIT_PACKAGE = "com.unity.ext.nunit"
+
+# 2D 项目必需包（Unity 6 的 3D/URP 模板不含，缺了 Tilemap/PixelPerfect 类直接不存在）
+PACKAGES_2D = [
+    "com.unity.2d.sprite",
+    "com.unity.2d.tilemap",
+    "com.unity.2d.animation",
+    "com.unity.2d.pixel-perfect",
+]
+
 # 各 Unity 主线出厂/内置包版本回退表
 FALLBACK_VERSIONS = {
     "com.unity.inputsystem": {6000: "1.11.2", 2022: "1.7.0"},
@@ -44,6 +53,11 @@ FALLBACK_VERSIONS = {
     "com.unity.ugui": {6000: "2.0.0", 2022: "1.0.0"},
     "com.unity.test-framework": {6000: "1.6.0", 2022: "1.1.33"},
     "com.unity.ext.nunit": {6000: "2.0.5", 2022: "1.0.6"},
+    # 2D 包（Unity 6 内置版本区间；解析失败时用这些兜底）
+    "com.unity.2d.sprite": {6000: "1.0.0", 2022: "1.0.0"},
+    "com.unity.2d.tilemap": {6000: "1.0.0", 2022: "1.0.0"},
+    "com.unity.2d.animation": {6000: "10.1.4", 2022: "9.0.4"},
+    "com.unity.2d.pixel-perfect": {6000: "5.0.3", 2022: "5.0.3"},
 }
 
 
@@ -64,6 +78,10 @@ def resolve_project_paths(out_path):
         return None
     idx = len(parts) - 1 - parts[::-1].index("Assets")
     project_root = "/".join(parts[:idx])
+    # "D:/MyProject/Assets" -> project_root "D:/MyProject"；盘符根目录（"D:/Assets"）时为 "D:"
+    # 需补回根斜杠，否则 os.path.join("D:", "Packages") 会拼出相对路径 "D:Packages"
+    if project_root.endswith(":"):
+        project_root += "/"
     assets_root = "/".join(parts[: idx + 1])
     return project_root, assets_root, out_path
 
@@ -125,6 +143,8 @@ def resolve_package_version(package_name, editor_data, project_root_hint):
                 pass
 
     # 2. 回退表：各 Unity 主线出厂版本
+    #    项目还没打开过时 ProjectVersion.txt 不存在，此时按最新主线（Unity 6）取值，
+    #    而不是直接放弃——否则全新项目一个包都写不进去，只能靠人手装。
     project_version = ""
     pv_path = os.path.join(project_root_hint, "ProjectSettings", "ProjectVersion.txt")
     if os.path.isfile(pv_path):
@@ -132,16 +152,21 @@ def resolve_package_version(package_name, editor_data, project_root_hint):
     match = re.match(r"m_EditorVersion:\s*(\d{4})\.(\d+)", project_version)
     if not match:
         match = re.match(r"(\d{4})\.(\d+)", project_version)
+
+    table = FALLBACK_VERSIONS.get(package_name, {})
     if match:
         major = int(match.group(1))
-        table = FALLBACK_VERSIONS.get(package_name, {})
         if major in table:
             return table[major]
+    # 版本未知（新项目首次生成）：用最高主线的默认版本兜底
+    if table:
+        newest = max(table)
+        return table[newest]
     return None
 
 
-def ensure_packages(project_root, editor_data, with_tests):
-    """确保 manifest 含 Input System、UGUI（含测试框架）；返回 Input System 是否就绪。"""
+def ensure_packages(project_root, editor_data, with_tests, dimension="3d"):
+    """确保 manifest 含所需包；返回 Input System 是否就绪。"""
     manifest_path = os.path.join(project_root, "Packages", "manifest.json")
     manifest = json.loads(read_text(manifest_path))
     deps = manifest.setdefault("dependencies", {})
@@ -150,6 +175,9 @@ def ensure_packages(project_root, editor_data, with_tests):
     packages = [INPUT_PACKAGE, UGUI_PACKAGE]
     if with_tests:
         packages += [TEST_PACKAGE, NUNIT_PACKAGE]
+    if dimension == "2d":
+        # Unity 6 的 3D/URP 模板不带 com.unity.2d.*，不装就没有 Tilemap/PixelPerfect/SpriteAtlas 类型
+        packages += PACKAGES_2D
     for package in packages:
         if package in deps:
             continue
@@ -205,22 +233,56 @@ def copy_tree(src, dst, namespace, replacements):
             content = content.replace("{{NS}}", namespace)
             for key, value in replacements.items():
                 content = content.replace(key, value)
-            # 包还没导入时，去掉无效 GUID 引用行（重跑后会回填）
             if name.endswith(".asmdef"):
-                content = "\n".join(
-                    line for line in content.splitlines()
-                    if "00000000000000000000000000000000" not in line)
+                content = strip_missing_guid_refs(content)
             write_text(os.path.join(target_dir, name), content)
 
 
+def strip_missing_guid_refs(content):
+    """包尚未导入时，引用里会留着全零 GUID 占位符；从 references 数组中摘掉。
+
+    必须走 JSON 往返而不是按行过滤：按行删会把数组尾元素删成 "[...]," 这种
+    非法 JSON，Unity 会直接报 asmdef 解析失败。解析失败时原样返回，交给人工看。
+    """
+    zero = "0" * 32
+    try:
+        data = json.loads(content)
+    except ValueError:
+        warn("asmdef 不是合法 JSON，无法清理零 GUID 引用，请人工检查。")
+        return content
+    refs = data.get("references")
+    if isinstance(refs, list):
+        data["references"] = [r for r in refs if zero not in str(r)]
+    return json.dumps(data, indent=4, ensure_ascii=False) + "\n"
+
+
 def write_meta_for(path, guid):
-    write_text(path + ".meta",
-               "fileFormatVersion: 2\n"
-               "guid: %s\n"
-               "MonoImporter: {}\n" % guid)
+    """asmdef 与 .cs 用不同的 importer 块；写错会触发重新导入并可能改写 GUID。"""
+    if path.endswith(".asmdef"):
+        body = ("fileFormatVersion: 2\n"
+                "guid: %s\n"
+                "AssemblyDefinitionImporter:\n"
+                "  externalObjects: {}\n"
+                "  userData: \n"
+                "  assetBundleName: \n"
+                "  assetBundleVariant: \n" % guid)
+    else:
+        body = ("fileFormatVersion: 2\n"
+                "guid: %s\n"
+                "MonoImporter:\n"
+                "  externalObjects: {}\n"
+                "  serializedVersion: 2\n"
+                "  defaultReferences: []\n"
+                "  executionOrder: 0\n"
+                "  icon: {instanceID: 0}\n"
+                "  userData: \n"
+                "  assetBundleName: \n"
+                "  assetBundleVariant: \n" % guid)
+    write_text(path + ".meta", body)
 
 
-def scaffold(out_path, namespace, with_tests, add_packages, editor_data):
+def scaffold(out_path, namespace, with_tests, add_packages, editor_data,
+             dimension="3d"):
     resolved = resolve_project_paths(out_path)
     if not resolved:
         log("[错误] --out 必须位于 Unity 项目的 Assets 目录内，例如 D:/MyProject/Assets/Game")
@@ -238,7 +300,7 @@ def scaffold(out_path, namespace, with_tests, add_packages, editor_data):
     # 1. Input System
     input_ready = True
     if add_packages:
-        input_ready = ensure_packages(project_root, editor_data, with_tests)
+        input_ready = ensure_packages(project_root, editor_data, with_tests, dimension)
         set_active_input_handler(project_root)
     input_guid = find_package_cache_asmdef_guid(project_root, INPUT_PACKAGE, "Unity.InputSystem.asmdef")
     if not input_guid:
@@ -281,6 +343,9 @@ def scaffold(out_path, namespace, with_tests, add_packages, editor_data):
         log(("%s. 打开 Test Runner 运行 InventoryTests（MCP: run_tests / get_test_job）。"
              % ("3" if input_ready else "3")))
     log("4. 按 references/02-input-and-fp-controller.md 搭建 Player 预制体。")
+    if dimension == "2d":
+        log("   [2D] 控制器/物理/导航请改读 references/11-2d-gameplay.md，"
+            "不要用 CharacterController + NavMesh。")
     return 0
 
 
@@ -289,18 +354,19 @@ def main():
     parser.add_argument("--out", required=True, help="目标目录，如 D:/MyProject/Assets/Game")
     parser.add_argument("--namespace", required=True, help="C# 根命名空间，如 MyGame")
     parser.add_argument("--no-tests", action="store_true", help="不生成测试程序集")
-    parser.add_argument("--add-packages", action="store_true", default=True,
-                        help="缺 Input System 时自动写 manifest（默认开启）")
-    parser.add_argument("--no-add-packages", dest="add_packages", action="store_false")
+    parser.add_argument("--no-add-packages", dest="add_packages", action="store_false",
+                        help="不改写 manifest.json，只生成代码")
     parser.add_argument("--editor-data", default=os.environ.get("UNITY_EDITOR_DATA", ""),
                         help="Editor/Data 目录（解析包版本用），可选")
+    parser.add_argument("--dimension", choices=["3d", "2d"], default="3d",
+                        help="2d 时额外写入 com.unity.2d.* 包（Unity 6 的 3D 模板不带）")
     args = parser.parse_args()
 
     if not re.match(r"^[A-Za-z_][A-Za-z0-9_.]*$", args.namespace):
         log("[错误] 命名空间不合法：%s" % args.namespace)
         return 1
     return scaffold(args.out, args.namespace, not args.no_tests, args.add_packages,
-                    args.editor_data or None)
+                    args.editor_data or None, args.dimension)
 
 
 if __name__ == "__main__":

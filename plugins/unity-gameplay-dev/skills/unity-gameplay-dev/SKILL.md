@@ -1,9 +1,14 @@
 ---
 name: unity-gameplay-dev
-description: "让 AI 通过 MCP（或命令行）自主完成 Unity 3D 单机游戏的玩法逻辑开发：从 GDD 规格到可玩、可测试、可构建的代码。覆盖 Unity 6（6000.x，第一人称、URP、UGUI、新 Input System）下的项目脚手架与代码规范、输入系统、第一人称控制器、准星交互、Animator 状态机、UI 面板栈/HUD、背包/对话/存档/对象池/音频、NavMesh 敌人 AI、Profiler 性能定位、构建发布与测试。提供可直接编译运行的 C# 框架模板（带 asmdef 与测试）和一键脚手架脚本。当用户要求在 Unity 里写玩法代码、做控制器/移动/视角、交互系统、背包/对话/存档、UI 菜单、敌人 AI、音效集成、性能优化、跑测试或出包，或把 GDD 规格落地为可玩功能时使用。与 unity-blender-mcp（资产管线）、aaa-game-gdd（设计文档）配套，不负责 3D 资产制作、不覆盖多人联机。"
+description: "让 AI 通过 MCP（或命令行）自主完成 Unity 3D 单机游戏的玩法逻辑开发：从 GDD 规格到可玩、可测试、可构建的代码。覆盖 Unity 6（6000.x，第一人称、URP、UGUI、新 Input System）下的项目脚手架与代码规范、输入系统、第一人称控制器、准星交互、Animator 状态机、UI 面板栈/HUD、背包/对话/存档/对象池/音频、NavMesh 敌人 AI、Profiler 性能定位、构建发布与测试。提供可直接编译运行的 C# 框架模板（带 asmdef 与测试）和一键脚手架脚本。当用户要求在 Unity 里写玩法代码、做控制器/移动/视角、交互系统、背包/对话/存档、UI 菜单、敌人 AI、音效集成、性能优化、跑测试或出包，或把 GDD 规格落地为可玩功能时使用。与 unity-blender-mcp（资产管线）、aaa-game-gdd（设计文档）配套，不负责 3D 资产制作、不覆盖多人联机。 English: Unity 6 single-player gameplay development from GDD specs to playable, testable, buildable code: project scaffold, Input System, first-person controller, interaction, UI panel stack, inventory, dialogue, save system, object pooling, audio, NavMesh enemy AI, profiling, build and tests. Use when writing Unity gameplay code, controllers, interaction, UI, AI, or shipping a build."
 ---
 
 # Unity 玩法开发技能（第一人称 / Unity 6 / URP）
+
+> **路径约定（先读这一行）**：本文件里所有 `scripts/`、`references/`、`assets/` 都是**相对于本 SKILL.md 所在目录**。
+> 执行脚本前先定位该目录。不同宿主的安装位置不同：Claude Code 插件在插件目录下；Cursor/Codex 由 `install.ps1`
+> 装到 `<项目>/skills/game-dev/<技能名>/`。不确定时先用 `glob` 找到本 SKILL.md 的绝对路径，再用绝对路径调用脚本。
+> 直接在项目根敲 `python scripts/xxx.py` 会 file-not-found。
 
 ## 概述
 
@@ -14,6 +19,8 @@ description: "让 AI 通过 MCP（或命令行）自主完成 Unity 3D 单机游
 - **做**：玩法逻辑、控制器、交互、UI、背包/对话/存档、AI、音频、测试、构建与性能定位。
 - **不做**：3D 资产制作/导入/材质（交给 unity-blender-mcp 技能）；多人联机（Netcode）；Shader 手写（仅给特效选型建议）。
 - 目标项目用第一人称；第三人称/俯视角沿用同一套架构（状态机、输入、交互、UI 不变），仅控制器与相机分支不同，见 `references/02`。
+- **2D 项目**：架构层（状态机/事件总线/存档/背包/UI 栈）照用，但角色控制、物理、导航、性能预算必须换，
+  见 `references/11-2d-gameplay.md`。不要拿 3D 的 `CharacterController` + `NavMesh` 去做 2D。
 
 ## 前置环境
 
@@ -98,6 +105,13 @@ python scripts/new_gameplay.py --out "D:/MyProject/Assets/Game" --namespace MyGa
 - `references/08-performance.md`：60fps 预算、Profiler/Frame Debugger 流程、常见热点
 - `references/09-build-release.md`：构建设置、场景清单、Steam/Deck 检查、存档兼容
 - `references/10-troubleshooting.md`：编译/空引用/执行顺序/输入/导航/UI 常见错误对照
+- `references/11-2d-gameplay.md`：**做 2D 项目先读这篇**。2D 包安装、Sprite 导入、Physics2D 与层矩阵、
+  2D 平台跳跃（coyote time/jump buffer）、Tilemap 与 Composite 碰撞、像素完美相机、
+  **以 overdraw 与 Batch 计的 2D 预算**（三角面预算表对 2D 无意义）。
+
+> **2D 项目注意**：本技能的 C# 模板默认是 3D 第一人称（`CharacterController`、`NavMesh`）。
+> 2D 请复用与维度无关的部分（`EventBus`、`StateMachine`、`Inventory`、`SaveSystem`、`Health`、
+> `ObjectPool`、`UIManager`、`AudioManager`），而控制器、导航、物理、性能预算按 `references/11` 重写。
 
 ## 铁律
 

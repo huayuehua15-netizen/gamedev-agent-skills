@@ -13,12 +13,13 @@
 - `Interactor` 只找接口、发当前目标变更事件；不写具体交互逻辑。
 - 具体物继承 `InteractableBase`：实现 `Interact`，可选重写 `PromptText`、`SetHighlight`。
 - 高亮（描边）：URP Renderer Feature 屏幕空间描边，或材质自发光；在 `SetHighlight` 里切换。
-- 交互层与 UI 解耦：Interactor 发 `TargetChanged(IInteractable)` 事件，HUD 订阅。
+- 交互层与 UI 解耦：`Interactor` 通过 `EventBus` 发 `InteractionPromptEvent(string)`，HUD 订阅它更新提示文案
+  （模板里**没有** `TargetChanged(IInteractable)` 这种事件；需要"当前目标对象"时自己加一个字段/事件，别照抄旧文档）。
 
 ## 2. 准星交互配置（MCP）
 
 1. 交互物预制体：Layer 设 Interactable，加碰撞体（IsTrigger 与否按物理需求；SphereCast 两种都能命中）。
-2. 玩家 Interactor 字段：interactionMask 只勾 Interactable；raycast 起点用相机。
+2. 玩家 `Interactor` 字段：`interactableLayers`（**不是** `interactionMask`）只勾 Interactable；raycast 起点用相机。
 3. HUD 准星 + 提示文本（见 04）。
 4. Play 验证：靠近时提示出现、离开消失、被墙挡住不触发、多物体取最近。
 

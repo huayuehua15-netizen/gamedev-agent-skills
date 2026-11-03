@@ -1,9 +1,13 @@
 ---
 name: blender-modeling-craft
-description: "解决大模型从零做 3D 模型质量差的问题：Blender 建模手艺 + 多角度渲染自检 + Unity 游戏化交付。涵盖参考图驱动建模、真实尺寸比例（含 1.7m 人体标尺）、blockout 体量、硬表面（盒建模/卡线/倒角/布尔/细分曲面）、有机雕塑与重拓扑、游戏级拓扑（四边面/边流/极）、UV 与 texel density、PBR 材质与法线烘焙、面数预算与 LOD、剪影 IoU 门禁（正交渲染与参考图比对比例，不过不许导出）+ 多机位质检渲染人审、FBX 导出 Unity 交接。当用户要求在 Blender 里从零建模/改模、做道具/武器/建筑/载具/家具/自然物、模型看着像方块堆砌或比例不对、需要卡线倒角拓扑 UV、要渲染检查模型效果、或为 Unity 做游戏就绪资产时使用。素材复用/导入管线交给 unity-blender-mcp；本技能只负责『自己动手做时怎么做得不烂』。"
+description: "解决大模型从零做 3D 模型质量差的问题：Blender 建模手艺 + 多角度渲染自检 + Unity 游戏化交付。涵盖参考图驱动建模、真实尺寸比例（含 1.7m 人体标尺）、blockout 体量、硬表面（盒建模/卡线/倒角/布尔/细分曲面）、有机雕塑与重拓扑、游戏级拓扑（四边面/边流/极）、UV 与 texel density、PBR 材质与法线烘焙、面数预算与 LOD、剪影 IoU 门禁（正交渲染与参考图比对比例，不过不许导出）+ 多机位质检渲染人审、FBX 导出 Unity 交接。当用户要求在 Blender 里从零建模/改模、做道具/武器/建筑/载具/家具/自然物、模型看着像方块堆砌或比例不对、需要卡线倒角拓扑 UV、要渲染检查模型效果、或为 Unity 做游戏就绪资产时使用。素材复用/导入管线交给 unity-blender-mcp；本技能只负责『自己动手做时怎么做得不烂』。 English: Blender modeling craft for game-ready assets: reference-driven modeling, real-world scale, blockout, hard-surface, topology and UV, PBR, poly budgets, LOD, silhouette IoU gate, multi-angle QA renders, and Unity handoff. Use when modeling or fixing 3D assets in Blender, or when proportions or topology look wrong."
 ---
 
 # Blender 建模手艺：从"方块堆砌"到游戏就绪资产
+
+> **路径约定**：本文件中所有 `scripts/`、`references/`、`assets/` 都**相对于本 SKILL.md 所在目录**。
+> 换到别的宿主或别的工作目录时，先把 SKILL.md 目录解析成绝对路径再调用。
+> **务必带上 `--python-exit-code 1`**：Blender 默认异常退出码为 0，漏掉这个参数时门禁失败也会显示成成功。
 
 ## 定位与边界
 
@@ -45,16 +49,22 @@ description: "解决大模型从零做 3D 模型质量差的问题：Blender 建
 | `scripts/qa_render.py` | 两种模式：① 4 角度（35/125/215/305°）1280×720 质检渲染，中性灰背景、三点布光、角点法取景；② `--gate` 剪影门禁：正交渲染后与参考图算 IoU / 宽高比，不通过退出码 1 |
 
 ```bash
+# 注意：--python-exit-code 1 不是可选项。Blender 默认 Python 异常退出码为 0，
+# 不加这个参数时，脚本崩了 / 门禁没过，外层脚本和 CI 都会看到"成功"。
+
 # 建一个带人体标尺的参考场景（在空场景里）
-blender --background --python scripts/model_helpers.py -- --build-scale-rig
-# 审计当前模型（--budget-tris 可按 07 的预算传）
-blender --background --python scripts/topology_audit.py -- path/to/asset.blend --budget-tris 3000
+blender --background --python-exit-code 1 --python scripts/model_helpers.py -- --build-scale-rig
+# 审计当前模型（--budget-tris 可按 07 的预算传；三角面已计入修改器）
+blender --background --python-exit-code 1 --python scripts/topology_audit.py -- path/to/asset.blend --budget-tris 3000
 # 出 4 张质检图
-blender --background --python scripts/qa_render.py -- path/to/asset.blend --outdir C:/tmp/qa
+blender --background --python-exit-code 1 --python scripts/qa_render.py -- path/to/asset.blend --outdir C:/tmp/qa
 # 剪影门禁（不通过返回 1，不会悄悄放过）
-blender --background --python scripts/qa_render.py -- path/to/asset.blend --gate \
+blender --background --python-exit-code 1 --python scripts/qa_render.py -- path/to/asset.blend --gate \
     --ref-front refs/front.png --ref-side refs/side.png --stage final --outdir C:/tmp/qa
 ```
+
+> **参考图必须是正交的正视图/侧视图剪影**（透明背景或纯色底、无透视、无投影、无渐变背景）。
+> 带透视的商品照片拿去比 `--stage final` 的 0.85 阈值，会因为近大远小必然失败——那不是模型的问题。
 
 MCP 内用 `execute_blender_code` 时：每块代码自包含、按名字重新选择对象、超时约 180s 就拆块；改用户场景前先另存；参考图/标尺放 `REF_*` 集合（审计与渲染默认跳过）。
 

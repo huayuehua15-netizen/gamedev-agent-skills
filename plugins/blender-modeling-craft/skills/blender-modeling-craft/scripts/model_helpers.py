@@ -79,7 +79,10 @@ def add_reference_image(filepath, view="front", alpha=0.5, size=2.0, location=No
 
 def add_dim_box(name, size, location=(0, 0, 0), collection=None, material=None):
     """边长 = size（米）的立方体。size 可为 (x, y, z) 或单值。"""
-    sx, sy, sz = (size * 3 if isinstance(size, (int, float)) else size)
+    if isinstance(size, (int, float)):
+        sx = sy = sz = float(size)
+    else:
+        sx, sy, sz = size
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=location)
     obj = bpy.context.object
     obj.name = name
@@ -136,8 +139,11 @@ def build_human_scale_rig(height=1.70, at=(0, 0, 0), collection_name="REF_HumanS
     head = height / 7.5
     hx, hy, hz = at
     # 名称, 尺寸(x,y,z), 中心高度, 左右偏移（0=居中）
+    # 头顶必须正好落在 height 上：头部中心 = height - 头高/2。
+    # （旧值是 7.0*head+0.10，实测算出 1.79m，比标称的 1.70m 高 9cm。）
+    head_box_h = head * 0.90
     parts = [
-        ("REF_Head",     (0.11, 0.13, head * 0.90), 7.0 * head + 0.10, 0.0),
+        ("REF_Head",     (0.11, 0.13, head_box_h),   height - head_box_h / 2.0, 0.0),
         ("REF_Neck",     (0.07, 0.07, 0.10),         6.55 * head,       0.0),
         ("REF_Torso",    (0.40, 0.20, 2.4 * head),   5.1 * head,        0.0),
         ("REF_Pelvis",   (0.30, 0.18, 0.8 * head),   3.6 * head,        0.0),

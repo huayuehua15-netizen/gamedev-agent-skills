@@ -4,6 +4,8 @@
 // 移除：删除本文件即可，无其它副作用。
 // 贴图后缀约定：_BC/_D/_Albedo=颜色(sRGB)  _N/_Normal/_NRM=法线
 //   _M/_Mask/_RMA/_ORM/_R/_Metal/_AO/_Roughness=数据贴图(Linear)  _E/_Emissive=自发光  _HDR=HDR
+// 2D 约定：文件名以 spr_ 开头、含 _spr，或位于 Assets/Imports/Sprites|Tiles/ 下
+//   → 按 Sprite 导入（Point 过滤、无 Mipmap、Clamp、不做压缩），避免像素画被 3D 规则毁掉。
 // 角色约定：路径含 /Characters/ 或文件名以 SK_ 开头 → Humanoid。
 
 using System.IO;
@@ -39,6 +41,26 @@ namespace McpAssetPipeline
             bool isNormal = n.EndsWith("_n") || n.Contains("_normal") || n.EndsWith("_nrm");
             bool isData = IsDataMask(n);
             bool isHdr = n.EndsWith("_hdr");
+            // 2D 资产：sprite / 瓦片图的导入设置与 3D PBR 贴图完全相反。
+            // 走 3D 规则会被双线性过滤 + 生成 Mipmap + 平铺，像素画直接毁掉。
+            string p2d = assetPath.Replace('\\', '/');
+            bool isSprite = n.StartsWith("spr_") || n.Contains("_spr") ||
+                            p2d.Contains("/Sprites/") || p2d.Contains("/Tiles/");
+
+            if (isSprite)
+            {
+                t.textureType = TextureImporterType.Sprite;
+                t.spriteImportMode = SpriteImportMode.Single;
+                t.filterMode = FilterMode.Point;       // 像素画不要双线性插值
+                t.mipmapEnabled = false;               // 2D 不做 Mipmap
+                t.wrapMode = TextureWrapMode.Clamp;    // 不要平铺出接缝
+                t.alphaIsTransparency = true;
+                t.sRGBTexture = true;
+                t.textureCompression = TextureImporterCompression.Uncompressed;
+                t.maxTextureSize = 4096;               // 精灵图集往往大于 2048
+                Debug.Log($"[MCP管线] 2D 精灵已设置: {assetPath}");
+                return;
+            }
 
             if (isNormal)
             {
@@ -60,8 +82,9 @@ namespace McpAssetPipeline
                 t.textureShape = TextureImporterShape.Texture2D;
             }
 
-            // 常规游戏分辨率上限 2048，避免外来 4K/8K 贴图直接进包
-            t.maxTextureSize = 2048;
+            // 上限是为"别把 8K 原图直接塞进包"，不是替艺术家决定分辨率。
+            // 4096 保留 4K 贴图的降采样余地；真正要压到 2048 的，按平台 Quality Override 做。
+            t.maxTextureSize = 4096;
             t.textureCompression = TextureImporterCompression.Compressed;
 
             Debug.Log($"[MCP管线] 贴图已设置: {assetPath} " +

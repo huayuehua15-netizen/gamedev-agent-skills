@@ -29,6 +29,26 @@ namespace {{NS}}
             _fsm.StateChanged += OnFsmStateChanged;
         }
 
+        private void OnEnable()
+        {
+            // ESC 必须在这里接：以前 PausePerformed 只被 PlayerLook 订阅（它只解锁光标），
+            // TogglePause() 零调用者 —— 按 ESC 的结果是"视角停住、鼠标解锁、人物照走"。
+            var input = InputReader.Instance;
+            if (input != null)
+            {
+                input.PausePerformed += TogglePause;
+            }
+        }
+
+        private void OnDisable()
+        {
+            var input = InputReader.Instance;
+            if (input != null)
+            {
+                input.PausePerformed -= TogglePause;
+            }
+        }
+
         private void Start()
         {
             GoToMenu();
@@ -79,7 +99,6 @@ namespace {{NS}}
                 _fsm.Change(new PlayingState());
             }
         }
-
         public void QuitGame()
         {
 #if UNITY_EDITOR
@@ -130,7 +149,18 @@ namespace {{NS}}
 
         private class PlayingState : IState
         {
-            public void Enter() { Time.timeScale = 1f; }
+            public void Enter()
+            {
+                Time.timeScale = 1f;
+                // 恢复：玩家输入重新生效、锁回光标
+                if (InputReader.Instance != null)
+                {
+                    InputReader.Instance.SetInputEnabled(true);
+                }
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
+
             public void Tick() { }
             public void FixedTick() { }
             public void Exit() { }
@@ -138,10 +168,25 @@ namespace {{NS}}
 
         private class PausedState : IState
         {
-            public void Enter() { Time.timeScale = 0f; }
+            public void Enter()
+            {
+                // 三件事必须一起做，缺一个就会"暂停了但还能动"或"能动但看不见鼠标"
+                Time.timeScale = 0f;
+                if (InputReader.Instance != null)
+                {
+                    InputReader.Instance.SetInputEnabled(false);
+                }
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
+
             public void Tick() { }
             public void FixedTick() { }
-            public void Exit() { Time.timeScale = 1f; }
+
+            public void Exit()
+            {
+                Time.timeScale = 1f;
+            }
         }
     }
 }

@@ -27,26 +27,29 @@ namespace {{NS}}
             SetLookEnabled(true);
         }
 
+        // 注意：这里不再订阅 PausePerformed。
+        // 暂停的权威处理在 GameManager（Time.timeScale + 输入开关 + 光标），
+        // 视角只需要跟随 GameState 变化；两边都抢着改光标会互相打架。
         private void OnEnable()
         {
-            if (input != null)
+            if (GameManager.Instance != null)
             {
-                input.PausePerformed += OnPause;
+                GameManager.Instance.StateChanged += OnGameStateChanged;
+                OnGameStateChanged(GameManager.Instance.State, GameManager.Instance.State);
             }
         }
 
         private void OnDisable()
         {
-            if (input != null)
+            if (GameManager.Instance != null)
             {
-                input.PausePerformed -= OnPause;
+                GameManager.Instance.StateChanged -= OnGameStateChanged;
             }
         }
 
-        private void OnPause()
+        private void OnGameStateChanged(GameState previous, GameState current)
         {
-            // 暂停时不在这里改光标，由 UI/流程层统一控制；这里只保证可恢复
-            SetLookEnabled(Cursor.lockState != CursorLockMode.Locked);
+            SetLookEnabled(current == GameState.Playing);
         }
 
         private void LateUpdate()
@@ -75,9 +78,8 @@ namespace {{NS}}
 
         public void SetLookEnabled(bool enabled)
         {
+            // 视角只管视角；光标锁定交给 GameManager 的 PausedState/PlayingState 统一管理。
             _lookEnabled = enabled;
-            Cursor.lockState = enabled ? CursorLockMode.Locked : CursorLockMode.None;
-            Cursor.visible = !enabled;
         }
     }
 }

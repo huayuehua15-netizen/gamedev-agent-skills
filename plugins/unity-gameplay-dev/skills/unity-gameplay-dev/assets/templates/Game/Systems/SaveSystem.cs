@@ -74,6 +74,9 @@ namespace {{NS}}
         public static void Write(int slot, SaveData data)
         {
             data.version = CurrentVersion;
+            // 先清空再写：同一个 SaveData 被 Write 两次（比如手动存 + 自动存）
+            // 原本会把每个 key 追加一遍，读档时得到重复条目。
+            data.entries.Clear();
             foreach (var saveable in Saveables)
             {
                 data.entries.Add(new SavedEntry(saveable.SaveKey, saveable.CaptureState()));

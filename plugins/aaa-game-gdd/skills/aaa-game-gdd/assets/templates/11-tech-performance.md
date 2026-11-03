@@ -6,9 +6,22 @@
 ## 1. 引擎锁定
 
 - 引擎/版本：{{ENGINE}}【填具体版本号】
-- 渲染管线：【URP / HDRP / Deferred+Lumen / Forward+ / Mobile】
+- 渲染管线：{{RENDER_PIPELINE}}
 - GI 方案：【烘焙 / 实时光追 / 混合】
 - 第三方插件/SDK：
+
+### 1.1 本引擎的硬约定（生成时已按所选引擎填好，勿混用别的引擎口径）
+
+| 项目 | 本引擎口径 |
+|---|---|
+| 资产交换格式 | {{EXCHANGE_FORMAT}} |
+| 前向/上向轴 | {{AXIS_CONVENTION}} |
+| 法线贴图约定 | {{NORMAL_MAP}} |
+| 碰撞体命名 | {{COLLISION_PREFIX}} |
+| 导航系统 | {{NAV_SYSTEM}} |
+| 数据资产 | {{DATA_ASSET}} |
+| LOD 机制 | {{LOD_MECHANISM}} |
+| 测试框架 | {{TEST_FRAMEWORK}} |
 
 | 名称 | 版本 | 用途 | 授权 | 平台支持 |
 |---|---|---|---|---|
@@ -20,7 +33,7 @@
 |---|---|---|---|---|
 | 推荐 PC | 1440p/4K | 60 | 16.6ms | 高 |
 | 最低 PC | 1080p | 30 | 33.3ms | 低 |
-| Steam Deck | 1200×800 | 30 | 33.3ms | Deck 档 |
+| Steam Deck | 1280×800 | 30 | 33.3ms | Deck 档 |
 | 主机 | 【】 | 【】 | 【】 | 【】 |
 
 最低配置（实测）：CPU【】GPU【】内存【】硬盘【】

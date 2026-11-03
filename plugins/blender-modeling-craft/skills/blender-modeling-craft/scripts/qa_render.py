@@ -510,8 +510,15 @@ VALUE_FLAGS = {
     "--ref-side": "ref_side",
 }
 
+KNOWN_STAGES = ("blockout", "final")
+
 
 def parse_args(args):
+    """严格解析：任何不认识的参数、拼错的档位、`--flag=value` 写法都直接报错。
+
+    以前这里是 `else: i += 1` 静默跳过，`--gate=1` 会被无声丢掉——门禁根本没跑，
+    却仍然退出 0 并留下"渲染完成"的日志。宁可报错，也不能假装通过。
+    """
     opts = {
         "blend": None,
         "outdir": None,
@@ -530,20 +537,34 @@ def parse_args(args):
         if arg == "--gate":
             opts["gate"] = True
             i += 1
-        elif arg in VALUE_FLAGS:
+            continue
+        if arg.startswith("--") and "=" in arg:
+            raise RuntimeError(
+                "不支持 `%s` 这种等号写法，请写成 `%s 值`（空格分隔）"
+                % (arg, arg.split("=", 1)[0]))
+        if arg in VALUE_FLAGS:
             if i + 1 >= len(args):
                 raise RuntimeError("参数 %s 缺少值" % arg)
             key = VALUE_FLAGS[arg]
             value = args[i + 1]
             if key in ("iou_min", "aspect_tol"):
-                value = float(value)
+                try:
+                    value = float(value)
+                except ValueError:
+                    raise RuntimeError("参数 %s 需要数字，收到 %r" % (arg, value))
             opts[key] = value
             i += 2
-        elif arg.endswith(".blend") and opts["blend"] is None:
+            continue
+        if arg.endswith(".blend") and opts["blend"] is None:
             opts["blend"] = arg
             i += 1
-        else:
-            i += 1
+            continue
+        raise RuntimeError("无法识别的参数：%s（可用：--gate %s）"
+                           % (arg, " ".join(sorted(VALUE_FLAGS))))
+
+    if opts["stage"] not in KNOWN_STAGES:
+        raise RuntimeError("--stage 只能是 %s，收到 %r"
+                           % (" / ".join(KNOWN_STAGES), opts["stage"]))
     return opts
 
 
@@ -592,8 +613,13 @@ def main():
         print(json.dumps(report, ensure_ascii=False, indent=2))
         sys.exit(0 if report["passed"] else 1)
 
-    for p in render_turntable(None, outdir, opts["target"], opts["collection"]):
-        print("[渲染完成] %s" % p)
+    try:
+        for p in render_turntable(None, outdir, opts["target"], opts["collection"]):
+            print("[渲染完成] %s" % p)
+    except Exception as exc:
+        # 以前这段在 try 之外：渲染炸了也退 0，等于"渲染失败 = 通过"
+        print("[错误] 渲染失败：%s" % exc)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

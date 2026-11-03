@@ -1,9 +1,13 @@
 ---
 name: unity-blender-mcp
-description: "通过 MCP 自主操作 Unity 与 Blender，完成 3D 游戏资产的搜索复用、建模、清洗、导出、导入与验收全流程。核心原则是素材优先：优先从 MCP 内置素材源（Sketchfab、Poly Haven）与外部素材库（3d66 等国内站、TurboSquid、CGTrader、Kenney、Quaternius、Mixamo、AI 生成等）搜索复用现成资产，搜不到再在 Blender 自建。涵盖 MCP 工具发现与连接、bpy 自动化建模与批处理、素材审计清洗、Unity 正确 FBX 导出、Unity 导入设置（材质/LOD/碰撞/骨骼动画/Prefab）、批量导入后处理与故障排查。当用户要求用 MCP 操作 Blender 或 Unity、找 3D 模型/素材/动画、把下载素材导入 Unity、处理素材格式与授权、Blender 建模或改模、导出 FBX、搭建 Blender→Unity 管线、修复粉色材质/缩放/法线/轴/碰撞/动画异常时使用。"
+description: "通过 MCP 自主操作 Unity 与 Blender，完成 3D 游戏资产的搜索复用、建模、清洗、导出、导入与验收全流程。核心原则是素材优先：优先从 MCP 内置素材源（Sketchfab、Poly Haven）与外部素材库（3d66 等国内站、TurboSquid、CGTrader、Kenney、Quaternius、Mixamo、AI 生成等）搜索复用现成资产，搜不到再在 Blender 自建。涵盖 MCP 工具发现与连接、bpy 自动化建模与批处理、素材审计清洗、Unity 正确 FBX 导出、Unity 导入设置（材质/LOD/碰撞/骨骼动画/Prefab）、批量导入后处理与故障排查。当用户要求用 MCP 操作 Blender 或 Unity、找 3D 模型/素材/动画、把下载素材导入 Unity、处理素材格式与授权、Blender 建模或改模、导出 FBX、搭建 Blender→Unity 管线、修复粉色材质/缩放/法线/轴/碰撞/动画异常时使用。 English: Asset-first 3D pipeline driving Unity and Blender through MCP: search and reuse existing assets, audit and clean them, export FBX, and import into Unity with correct materials, LODs, colliders, skinned animation and prefabs. Use when sourcing 3D assets, building a Blender-to-Unity pipeline, or fixing pink materials, scale, normals, axes, colliders or animation issues."
 ---
 
 # Unity + Blender MCP 自主制作管线
+
+> **路径约定**：本文件中所有 `scripts/`、`references/`、`assets/` 都**相对于本 SKILL.md 所在目录**。
+> 换到别的宿主或别的工作目录时，先把 SKILL.md 目录解析成绝对路径再调用。
+> **命令行跑脚本务必带 `--python-exit-code 1`**：Blender 默认异常退出码为 0，漏掉这个参数时审计失败也会显示成成功。
 
 ## 概述
 

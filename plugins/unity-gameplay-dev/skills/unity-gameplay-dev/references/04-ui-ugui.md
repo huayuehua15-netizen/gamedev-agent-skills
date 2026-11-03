@@ -8,12 +8,18 @@
 2. Canvas 下挂 `CanvasScaler`、`GraphicRaycaster`（默认就有）。
 3. 场景唯一 EventSystem：Input System 项目用 `InputSystemUIInputModule`（不是 StandaloneInputModule）。
 4. 所有面板放 `Resources/UI/` 或 Addressables 组（见 05 资源加载）；UIManager 负责实例化。
-5. 文本用 TextMeshPro（TMP）；脚手架 HUD 用了 UnityEngine.UI.Text（零依赖最简），正式项目可切 TMP——asmdef 引用 GUID 相同（ugui 包内）。
+5. 文本用 TextMeshPro（TMP）；脚手架 HUD 用 `UnityEngine.UI.Text`（零额外依赖）。
+   **切 TMP 时要注意**：TMP 是独立程序集 `Unity.TextMeshPro`（GUID `6055be8ebefd69e48b49212b09b47b2f`），
+   与 UGUI（`2bafac87e7f4b9b418d9448d219b01ab`）**不是同一个**。切过去必须在 `Game.asmdef` 里补这条引用，
+   否则报 `CS0246: TMP_Text could not be found`（旧文档曾错误地说"GUID 相同，无需改 asmdef"）。
 
 ## 2. 面板栈规范
 
-- 每个面板一个预制体 + 一个继承 `UIPanel` 的脚本：`OnShow` / `OnHide` 传参、`CanvasGroup.interactable` 管理输入。
-- `UIManager` 维护栈：`Push<T>(args)` 入栈、`Pop()` 出栈；ESC 关闭顶层（暂停菜单/对话/背包共用）。
+- 每个面板一个预制体 + 一个继承 `UIPanel` 的脚本：重写 `OnOpen()` / `OnClose()`（**无参数**），
+  用 `CanvasGroup.interactable` 管理输入；`HandleBack()` 返回 true 表示该面板自己消费了返回键。
+- `UIManager` 维护栈：`Open<T>()` 入栈、`CloseCurrent()` 出栈、`HandleBack()` 统一处理 ESC
+  （模板里**没有** `Push<T>(args)` / `Pop()` 这种签名）。`Open<T>()` 对同一面板做了去重，
+  重复打开不会把同一个面板压两次导致关不掉。
 - 面板只通过参数/事件与系统通信，不直接 Find 玩家组件；如 HUD 血条订阅 `Health.Changed`。
 - 面板打开策略：HUD 常驻（不进栈）；菜单/背包/对话/暂停进栈；栈顶下面的面板 `interactable=false`（CanvasGroup 已经做了）。
 - 过渡：0.12~0.2s 淡入淡出/缩放，用 unscaled time（暂停时也能动）。

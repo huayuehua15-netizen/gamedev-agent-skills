@@ -29,9 +29,13 @@
 
 ## 4. SaveSystem（存档）
 
-- 每个需要持久化的组件实现 `ISaveable { string Id; object Capture(); void Restore(object data); }`；静态注册表在 OnEnable 注册、OnDisable 注销。
-- 槽位：`%persistentDataPath%/saves/slot_<n>.json`；先写 `.tmp` 再原子替换（防写一半损坏）。
+- 每个需要持久化的组件实现模板里的 `ISaveable`，**实际签名以 `SaveSystem.cs` 为准**：
+  `string SaveKey { get; }` / `object CaptureState()` / `void RestoreState(string json)`。
+  通过 `SaveSystem.Register(this)` 登记，`OnDisable` 时 `Unregister`。
+- 槽位：`%persistentDataPath%/save_slot_<n>.json`（`SaveSystem.FilePattern` 定义，改路径就改这一处）。
+  先写 `.tmp` 再替换（防写一半损坏）。
 - `SaveData` 顶层 `version`（当前 1）；读档遇到旧版本走迁移函数链，禁止直接反序列化后假装兼容。
+- `SaveSystem.Write` 会**先清空 `data.entries` 再重填**：同一个 `SaveData` 连续写两次不会产生重复 key。
 - 只存：场景名、玩家位置/朝向、血量、背包 id+count、剧情标志位/任务状态、已用/已拾取物 id。
 - 不存：SO 资产、组件引用、运行时临时对象；读档后按 id 重建（物品查 SO、敌人按场景重刷）。
 - 加字段时：version+1、写迁移；发布后绝不能改旧版本的字段语义。
@@ -39,9 +43,11 @@
 ## 5. ObjectPool（对象池）
 
 - 高频生成对象（子弹、命中特效、音效、敌人）走池，禁止 Instantiate/Destroy 每帧调用。
-- 预制体挂 `PooledObject`（Release 回池）；`ObjectPool.Prewarm(prefab, n)` 在加载时预热。
-- 池对象必须实现重置（位置、速度、状态、材质参数），防止"上次的血/特效"残留。
-- 容量按需增长，设上限防泄漏；切场景时清空场景级池，全局池（特效）保留。
+- 模板里的 `ObjectPool` 实际 API：`new ObjectPool(prefab, prewarm, parent)` → `Get(position, rotation)` / `Release(go)`；
+  预制体上挂 `PooledObject`，用 `Bind(pool)` 绑定、`obj.Release()` 回池。`CountAll` 可查当前总数。
+- 模板**没有**内置容量上限。要防泄漏就自己在外层加计数与上限，别指望池子自己拦住。
+- 池对象必须实现重置（位置、速度、状态、材质参数），防止"上次的血/特效"残留——`PooledObject` 不替你做这件事。
+- 切场景时清空场景级池，全局池（特效）保留。
 
 ## 6. 新系统接入规范（照此顺序，不破坏架构）
 

@@ -14,6 +14,7 @@ Blender 素材审计脚本（Unity + Blender MCP 管线）
 
 import bpy
 import json
+import math
 import os
 import sys
 
@@ -21,10 +22,17 @@ SUPPORTED_IMPORT = {
     ".fbx": lambda p: bpy.ops.import_scene.fbx(filepath=p),
     ".glb": lambda p: bpy.ops.import_scene.gltf(filepath=p),
     ".gltf": lambda p: bpy.ops.import_scene.gltf(filepath=p),
-    ".stl": lambda p: bpy.ops.import_mesh.stl(filepath=p),
+    ".stl": None,  # 4.2 起旧的 import_mesh.stl 下线，改用 wm.stl_import
     ".dae": lambda p: bpy.ops.wm.collada_import(filepath=p),
     ".obj": None,  # 4.x 用 wm.obj_import，3.x 用 import_scene.obj，运行时解析
 }
+
+
+def _stl_import(path):
+    if hasattr(bpy.ops.wm, "stl_import"):
+        bpy.ops.wm.stl_import(filepath=path)
+    else:
+        bpy.ops.import_mesh.stl(filepath=path)
 
 
 def _obj_import(path):
@@ -53,6 +61,8 @@ def import_files(files):
             continue
         if ext == ".obj":
             _obj_import(f)
+        elif ext == ".stl":
+            _stl_import(f)
         elif ext in SUPPORTED_IMPORT:
             SUPPORTED_IMPORT[ext](f)
         else:
@@ -93,18 +103,25 @@ def audit_report():
     rigged = 0
 
     for o in bpy.context.scene.objects:
+        # FBX / glTF 导入默认是 QUATERNION 旋转模式，此时 rotation_euler 恒为 0。
+        # 只读 euler 会把"旋转未应用"这个最关键的导入问题全部漏掉，所以按模式取值。
+        if o.rotation_mode == "QUATERNION":
+            rot_deg = [round(math.degrees(a), 3) for a in o.rotation_quaternion.to_euler()]
+        else:
+            rot_deg = [round(math.degrees(a), 3) for a in o.rotation_euler]
+
         item = {
             "name": o.name,
             "type": o.type,
             "location": [round(v, 4) for v in o.location],
-            "rotation_euler_deg": [round(v * 57.2958, 3) for v in o.rotation_euler],
+            "rotation_euler_deg": rot_deg,
             "scale": [round(v, 4) for v in o.scale],
             "dimensions_m": [round(v, 4) for v in o.dimensions],
         }
         if any(abs(s - 1.0) > 0.001 for s in o.scale):
             warnings.append(f"对象 {o.name} 缩放未应用（scale != 1）")
-        if any(abs(v) > 0.001 for v in o.rotation_euler):
-            warnings.append(f"对象 {o.name} 旋转未应用（rotation_euler != 0）")
+        if any(abs(v) > 0.001 for v in rot_deg):
+            warnings.append(f"对象 {o.name} 旋转未应用（旋转角 != 0）")
 
         if o.type == "MESH":
             mesh = o.data
@@ -148,8 +165,12 @@ def audit_report():
                     data_tex = any(k in lower for k in
                                    ("_n", "_normal", "_nrm", "_rma", "_orm", "_m", "_ao",
                                     "_rough", "_metal", "_mask"))
-                    if data_tex and cs == "sRGB IEC61966-2.1":
-                        warnings.append(f"贴图 {img.name} 疑似数据贴图但色彩空间是 sRGB")
+                    # Blender 4.x 的 OCIO 色彩空间名是 "sRGB" / "Non-Color" /
+                    # "Linear Rec.709"，不是 ICC 的 "sRGB IEC61966-2.1"；
+                    # 旧比较永远不成立，这条唯一的贴图校验形同虚设。
+                    is_srgb = cs.lower().startswith("srgb")
+                    if data_tex and is_srgb:
+                        warnings.append(f"贴图 {img.name} 疑似数据贴图但色彩空间是 {cs}")
                     if missing:
                         warnings.append(f"材质 {m.name} 的贴图 {img.name} 文件丢失: {img.filepath}")
                     mat["textures"].append({
@@ -195,22 +216,38 @@ def audit_report():
     return report
 
 
-def main():
+AUDIT_JSON_START = "===AUDIT_JSON_START==="
+AUDIT_JSON_END = "===AUDIT_JSON_END==="
+
+
+def run_cli():
+    """CLI 入口：无论成功失败都要给出确定的结果。
+
+    - 没有 `--` 参数时直接报错退出，不再默默审计 Blender 启动场景（默认为一个
+      Cube/Camera/Light），那会产出一份格式合法但内容完全错误的"体检通过"。
+    - 有任何 warning 或导入失败 → 退出码 1，让 CI 和 Agent 能真的拦住问题。
+    """
     argv = sys.argv
     files = argv[argv.index("--") + 1:] if "--" in argv else []
-    if files:
+    if not files:
+        print("[错误] 需要通过 `--` 传入至少一个模型文件，"
+              "例如：blender --background --python blender_asset_audit.py "
+              "-- --python-exit-code 1 -- asset.fbx")
+        return 2
+    try:
         _reset_scene()
         import_files(files)
-    report = audit_report()
-    print("===AUDIT_JSON_START===")
+        report = audit_report()
+    except Exception as exc:  # noqa: BLE001
+        import traceback
+        traceback.print_exc()
+        print("[错误] 审计失败：%s" % exc)
+        return 1
+    print(AUDIT_JSON_START)
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    print("===AUDIT_JSON_END===")
+    print(AUDIT_JSON_END)
+    return 1 if report.get("warnings") else 0
 
 
-try:
-    _name = __name__  # 兼容 MCP 插件 exec 时未注入 __name__ 的情况
-except NameError:
-    _name = ""
-
-if _name == "__main__":
-    main()
+if __name__ == "__main__":
+    sys.exit(run_cli())

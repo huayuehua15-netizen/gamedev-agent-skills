@@ -16,7 +16,11 @@ Master
 ## 2. AudioManager 用法
 
 - 双音乐源做淡变（CrossFade 1.5~2s）；16 个音效源组成池（模板已实现），避免每声效 Instantiate。
-- 2D 音效（UI/拾取）：`PlaySfx(clip, SfxGroup.UI)`；3D 音效（脚步/门/敌人）：`PlaySfxAt(clip, position, group)`，带 Spatial Blend=1、距离衰减（近 3m/远 25m）。
+- **实际方法签名以 `AudioManager.cs` 为准**（模板里没有 `SfxGroup` 枚举）：
+  - 2D 音效（UI/拾取）：`PlaySfx(clip, volume, pitchVariance)`；
+  - 3D 音效（脚步/门/敌人）：`PlaySfxAtPoint(clip, position, volume)`。
+- ⚠️ `AudioSource` 的 3D 衰减 Unity 默认是 **1m~500m**，模板**没有**改这两个值。要"近 3m / 远 25m"必须自己设
+  `minDistance`/`maxDistance`，并把 `spatialBlend = 1f`，否则 3D 音效听起来像全场同响。
 - 循环音（环境/机器）：单独起源，可淡入淡出。
 - 动画音效走动画事件（Footstep、AttackSwing、Impact），与动画帧对齐（见 03）。
 

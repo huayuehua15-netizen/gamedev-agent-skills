@@ -49,7 +49,13 @@ SHEET_TYPES = {
     "animation": ("animation-sheet.md",  "animations", "AN"),
     "dialogue":  ("dialogue-sheet.md",   "dialogue",   "DL"),
     "system":    ("system-sheet.md",     "systems",    "SYS"),
+    # 2D 专用
+    "sprite":    ("sprite-sheet.md",     "sprites",    "SPR"),
+    "tileset":   ("tileset-sheet.md",    "tilesets",   "TS"),
 }
+
+# 2D 项目建议的子目录（init --dimension 2d 时并入 SUBDIRS）
+SUBDIRS_2D = ["sprites", "tilesets"]
 
 # 可切换编号前缀的子类型：--subtype
 SUBTYPES = {
@@ -62,6 +68,46 @@ ENGINE_NAMES = {
     "unreal": "Unreal Engine",
     "godot": "Godot",
     "agnostic": "未指定（引擎无关）",
+}
+
+# 引擎差异配置：这些字段会被真正写进模板，而不是只换一个显示名。
+# 以前的 --engine 只影响封面上的一个字符串，其余全是 Unity 口径，写 GDD 的
+# Godot/Unreal 用户会拿到一份"Unity 文档改了个封面"。
+ENGINE_PROFILES = {
+    "unity": {
+        "EXCHANGE_FORMAT": "FBX",
+        "AXIS_CONVENTION": "+Z 为前、+Y 为上（左手坐标系）",
+        "COLLISION_PREFIX": "无前缀约定，导入后挂 Collider 组件",
+        "NAV_SYSTEM": "NavMesh（烘焙 Navigation 数据）",
+        "DATA_ASSET": "ScriptableObject",
+        "LOD_MECHANISM": "LODGroup（阈值按屏幕相对高度占比）",
+        "RENDER_PIPELINE": "Built-in / URP / HDRP",
+        "NORMAL_MAP": "OpenGL（绿通道向上 Y+）",
+        "TEST_FRAMEWORK": "Unity Test Framework（EditMode/PlayMode）",
+    },
+    "unreal": {
+        "EXCHANGE_FORMAT": "FBX",
+        "AXIS_CONVENTION": "+X 为前、+Z 为上（左手坐标系）",
+        "COLLISION_PREFIX": "UCX_（凸包）/ UBX_（盒）/ USP_（球）/ UCP_（胶囊）",
+        "NAV_SYSTEM": "NavMesh + Recast（NavMeshBoundsVolume）",
+        "DATA_ASSET": "DataAsset / DataTable",
+        "LOD_MECHANISM": "Static Mesh LOD Group + Nanite（视项目）",
+        "RENDER_PIPELINE": "Deferred / Forward+（Lumen 视项目）",
+        "NORMAL_MAP": "DirectX（绿通道向下 Y−）",
+        "TEST_FRAMEWORK": "Automation Test Framework（Gauntlet）",
+    },
+    "godot": {
+        "EXCHANGE_FORMAT": "glTF 2.0（首选）；FBX 需 4.3+ 的 ufbx 支持",
+        "AXIS_CONVENTION": "-Z 为前、+Y 为上（右手坐标系，与 glTF 一致）",
+        "COLLISION_PREFIX": "-col（三角碰撞）/ -convcol（凸包）/ -colonly",
+        "NAV_SYSTEM": "NavigationRegion3D + NavigationMesh（运行时烘焙）",
+        "DATA_ASSET": "Resource（.tres）",
+        "LOD_MECHANISM": "自动 LOD / VisibilityRange 节点",
+        "RENDER_PIPELINE": "Forward+ / Mobile / Compatibility",
+        "NORMAL_MAP": "OpenGL（绿通道向上 Y+）",
+        "TEST_FRAMEWORK": "GUT / GdUnit4（社区插件）",
+    },
+    "agnostic": {},  # 未指定引擎：全部留空由用户填
 }
 
 SUBDIRS = ["scenes", "levels", "characters", "props", "animations", "dialogue", "systems"]
@@ -96,18 +142,29 @@ def cmd_init(args) -> int:
         return 1
 
     gdd_root.mkdir(parents=True, exist_ok=False)
-    for d in SUBDIRS:
+    subdirs = list(SUBDIRS)
+    if getattr(args, "dimension", "3d") == "2d":
+        subdirs += SUBDIRS_2D
+    for d in subdirs:
         (gdd_root / d).mkdir(exist_ok=True)
+
+    engine_key = (args.engine or "agnostic").lower()
+    if engine_key not in ENGINE_NAMES:
+        print(f"[错误] 未知引擎 {args.engine}，可选：{', '.join(ENGINE_NAMES)}")
+        return 1
 
     mapping = {
         "GAME_NAME": args.name,
         "DATE": today(),
-        "ENGINE": ENGINE_NAMES.get(args.engine.lower(), args.engine),
+        "ENGINE": ENGINE_NAMES[engine_key],
         "GENRE": args.genre or "【待确认】",
         "ITEM_NAME": "",
         "PREFIX": "",
         "NUMBER": "",
     }
+    # 把该引擎的差异字段真正写进模板；agnostic 时保留占位符让用户自己填。
+    for key, value in ENGINE_PROFILES.get(engine_key, {}).items():
+        mapping[key] = value
 
     for tpl_name, out_name in CORE_DOCS:
         tpl_path = TEMPLATE_DIR / tpl_name
@@ -119,7 +176,10 @@ def cmd_init(args) -> int:
         print(f"  生成 {out_name}")
 
     print()
-    print(f"[完成] GDD 文档树已创建：{gdd_root}")
+    print(f"[完成] GDD 文档树已创建：{gdd_root}（引擎口径：{ENGINE_NAMES[engine_key]}）")
+    if engine_key == "agnostic":
+        print("[提示] 未指定引擎，11-技术与性能.md 里的引擎相关字段仍是【待确认】。")
+        print("       确定引擎后重跑：--engine unity|unreal|godot")
     print("下一步：")
     print("  1. 先填写 01-愿景与Pitch.md、02-美术圣经.md、11-技术与性能.md")
     print("  2. 用 `python new_gdd.py sheet --type scene --name \"场景名\" --out "
@@ -211,10 +271,12 @@ def main() -> int:
     p_init.add_argument("--engine", default="agnostic",
                         help="unity | unreal | godot | agnostic（默认）")
     p_init.add_argument("--genre", default="", help="游戏类型（可选）")
+    p_init.add_argument("--dimension", choices=["3d", "2d"], default="3d",
+                        help="2d 时额外创建 sprites/ tilesets/ 子目录")
 
     p_sheet = sub.add_parser("sheet", help="生成单个对象单页")
     p_sheet.add_argument("--type", required=True,
-                         help="scene | level | character | prop | animation | dialogue | system")
+                         help="scene | level | character | prop | animation | dialogue | system | sprite | tileset")
     p_sheet.add_argument("--name", required=True, help="对象名称，如 \"废弃医院\"")
     p_sheet.add_argument("--out", required=True, help="GDD 根目录（<游戏名>_GDD）")
     p_sheet.add_argument("--subtype", default="",

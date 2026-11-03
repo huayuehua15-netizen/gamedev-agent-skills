@@ -50,9 +50,11 @@ bpy.ops.export_scene.fbx(
 | 贴图（命名） | 通道 | 连接 |
 |---|---|---|
 | `T_名_BC` | RGB | `_BaseColorMap` |
-| `T_名_Mask` | **R=AO，G=Smoothness（1−Roughness），B=Metallic，A=1** | `_MaskMap` |
+| `T_名_Mask` | **R=Metallic，G=AO，B=Detail Mask（无则填 1），A=Smoothness（1−Roughness）** | `_MaskMap` |
 | `T_名_N` | 法线 | `_NormalMap` |
 | `T_名_E` | 自发光 | `_EmissiveColorMap` |
+
+> ⚠️ HDRP 的 Mask Map 通道顺序与 URP **完全不同**，和平常说的 ORM 也不一样。照抄 URP 或 ORM 的顺序会把金属度和 AO 对调、把平滑度塞进 Detail Mask 槽，材质会明显发暗/发金属。以 [Unity HDRP 官方文档](https://docs.unity3d.com/Packages/com.unity.render-pipelines.high-definition@17.4/manual/Mask-Map-and-Detail-Map.html) 为准：**R=Metallic、G=Ambient Occlusion、B=Detail Mask、A=Smoothness**。
 
 - 外部素材常见的 **glTF/ORM 贴图**是 R=AO、G=Roughness、B=Metallic（Blender 导出的标准）。进 URP/HDRP 都要重排通道：粗糙度要取反成平滑度。用第 4 节脚本一键转。
 
@@ -104,7 +106,14 @@ def pack_urp(base_dir, name, metal=None, rough=None, ao=None):
     aoimg.file_format = 'PNG'; aoimg.save()
 ```
 
-HDRP 的 `_Mask` 只需把最后打包改为：R=AO、G=1−Roughness、B=Metallic、A=1。
+HDRP 的 `_Mask` 通道顺序不同，打包要改成：**R=Metallic、G=AO、B=Detail Mask（无则 1.0）、A=1−Roughness**。
+```python
+# HDRP 版本示意（复用上面的 fit/load，只需改这四行）
+rgba[...,0] = fit(metal_a)                 # R = Metallic
+rgba[...,1] = fit(ao_a)                    # G = AO
+rgba[...,2] = 1.0                          # B = Detail Mask（无细节遮罩填 1）
+rgba[...,3] = 1.0 - fit(rough_a)           # A = Smoothness
+```
 
 ## 5. Unity 模型导入设置（Postprocessor 自动处理，或 MCP 手动）
 

@@ -14,7 +14,12 @@
   - `Interact`（Button，E/手柄 West）
   - `Attack`（Button，左键/RT）
   - `Pause`（Button，Esc/Start）
-- 控制器只读 `InputReader` 的 C# 事件与属性（`MoveVector`、`LookVector`、`JumpPressed`），不直接碰 InputAction。
+- 控制器只读 `InputReader` 的 C# 属性与事件（**实际成员名以 `InputReader.cs` 为准**）：
+  - 持续量属性：`Move`（Vector2）、`LookMouse`（鼠标像素增量）、`LookStick`（摇杆 -1..1）；
+  - 离散事件：`JumpPerformed`、`InteractPerformed`、`AttackPerformed`、`PausePerformed`，
+    以及 `SprintChanged(bool)` / `CrouchChanged(bool)`。
+  - 鼠标与摇杆**刻意分成两个属性**：像素/帧与 -1..1 差一个数量级，合并成一个 Look 会让两种设备手感无法同时调好。
+  - 不要直接碰 `InputAction`；也不要自己再建一份输入表。
 - 注意：鼠标 Look 绑定 `<Mouse>/delta`；手柄 Look 绑定 `<Gamepad>/rightStick`；移动复合绑定 `WASD` 用法用 `AddCompositeBinding("2DVector")` + With("Up","<Keyboard>/w")...。
 - 手柄 UI 导航：EventSystem 上 `InputSystemUIInputModule` 替代 Standalone Input Module（装包后自动替换；没替换就手动换）。
 

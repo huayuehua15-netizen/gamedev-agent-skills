@@ -1,9 +1,13 @@
 ---
 name: aaa-game-gdd
-description: "3A 级 3D 游戏开发文档（GDD）设计与审校技能：把模糊的游戏想法转化为可直接交付开发、达到 Steam 上架标准、对标 3A 大作的完整文档体系。覆盖游戏愿景与 Pitch、美术圣经、场景与关卡描述、主线玩法与系统数值、剧情叙事与台词脚本、交互与 UI/UX、角色设定、物品/道具建模规格、动画与帧动画规格、音频设计、技术架构与性能预算、QA 与 Steam 上架验收。当用户要写游戏策划案、GDD、游戏设计文档、场景/关卡/玩法/台词/交互/建模/动画规格、美术需求单，或需要审校游戏文档是否达到可开发、可上架、对标 3A 的质量时使用。支持 Unity/Unreal/Godot，附带一键脚手架脚本生成整套文档树。"
+description: "3A 级 3D 游戏开发文档（GDD）设计与审校技能：把模糊的游戏想法转化为可直接交付开发、达到 Steam 上架标准、对标 3A 大作的完整文档体系。覆盖游戏愿景与 Pitch、美术圣经、场景与关卡描述、主线玩法与系统数值、剧情叙事与台词脚本、交互与 UI/UX、角色设定、物品/道具建模规格、动画与帧动画规格、音频设计、技术架构与性能预算、QA 与 Steam 上架验收。当用户要写游戏策划案、GDD、游戏设计文档、场景/关卡/玩法/台词/交互/建模/动画规格、美术需求单，或需要审校游戏文档是否达到可开发、可上架、对标 3A 的质量时使用。支持 Unity/Unreal/Godot，附带一键脚手架脚本生成整套文档树。 English: AAA-grade game design document (GDD) authoring and review for Steam-ready games. Covers vision/pitch, art bible, level specs, gameplay systems and numbers, narrative and dialogue, UI/UX, character/prop/animation/audio specs, tech performance budgets, and QA plus Steam release checklists. Supports Unity, Unreal and Godot. Use when writing or reviewing a GDD, game design doc, level/scene spec, art brief, or release QA checklist."
 ---
 
 # 3A 级游戏开发文档（GDD）技能
+
+> **路径约定**：本文件中所有 `scripts/`、`references/`、`assets/` 都**相对于本 SKILL.md 所在目录**。
+> 执行 `python scripts/new_gdd.py` 前先定位该目录（Cursor/Codex 由 `install.ps1` 装到 `<项目>/skills/game-dev/aaa-game-gdd/`）。
+> 不确定就先找到本 SKILL.md 的绝对路径，再用绝对路径调用脚本；在项目根直接敲相对路径会 file-not-found。
 
 ## 这个技能做什么
 
@@ -40,7 +44,7 @@ description: "3A 级 3D 游戏开发文档（GDD）设计与审校技能：把�
 ### 流程 A：新项目（从想法到完整文档体系）
 
 1. **澄清最小必要信息**（一次性向用户提问，不超过 4 个问题）：游戏类型与核心玩法一句话、引擎（Unity/Unreal/Godot/未定）、平台与目标帧率（PC 60fps？Steam Deck？）、美术风格倾向。问完即可开工，不要为了信息齐全反复追问，未知项在文档中显式标 `【待确认】`。
-2. **跑脚手架**：`python scripts/new_gdd.py init --name "游戏名" --out <输出目录> --engine unity`，生成整套 GDD 文档树。
+2. **跑脚手架**：`python scripts/new_gdd.py init --name "游戏名" --out <输出目录> --engine <第一步确认的引擎>`，生成整套 GDD 文档树。**`--engine` 要用第 1 步问出来的答案，不要一律填 unity**——它会真正决定文档里的轴向、碰撞命名、导航与数据资产口径。
 3. **按阶段顺序写文档**（见下「阶段门禁」），每篇先读对应 reference 再填对应模板。顺序：01 愿景 → 02 美术圣经 + 11 技术预算 → 04 核心玩法 → 07/08/09/06 规格类 → 03/05 内容类 → 12 验收。
 4. **每个场景/角色/道具/动画/对话/系统** 用 `scripts/new_gdd.py sheet` 生成独立单页文档，放在 GDD 对应子目录，核心文档只放索引表，不把几百个资产堆进一个文件。
 5. **过质量门禁**：每个阶段结束用 `12-steam-qa-checklist.md` 的门禁表逐项检查，不通过不进入下一阶段。
@@ -70,14 +74,19 @@ description: "3A 级 3D 游戏开发文档（GDD）设计与审校技能：把�
 # 初始化整套 GDD 文档树（在输出目录下建 <游戏名>_GDD/）
 python scripts/new_gdd.py init --name "游戏名" --out "D:/MyGame" --engine unity
 #   --engine：unity | unreal | godot | agnostic（默认）
+#             ★ 这不是装饰：选择后会真正写入该引擎的交换格式/轴向/碰撞命名/导航/数据资产/LOD 口径
 #   --genre：可选，游戏类型描述，会写入愿景文档
+#   --dimension：3d（默认）| 2d（额外建 sprites/ tilesets/ 子目录）
 
 # 为单个对象生成单页文档（自动放入对应子目录）
 python scripts/new_gdd.py sheet --type scene --name "废弃医院" --out "D:/MyGame/游戏名_GDD"
-#   --type：scene | level | character | prop | animation | dialogue | system
+#   --type：scene | level | character | prop | animation | dialogue | system | sprite | tileset
 #   --subtype：character 用 player/enemy/npc（CH/EN/NPC）；prop 用 item/weapon（PR/WP）
 #   例：sheet --type character --subtype enemy --name "缝合者" → characters/EN_01_缝合者.md
+#   例：sheet --type sprite --name "HeroIdle" → sprites/SPR_01_HeroIdle.md
 ```
+
+`init` 还支持 `--dimension 2d`：额外创建 `sprites/`、`tilesets/` 子目录（2D 项目用）。
 
 脚本自动替换 `{{GAME_NAME}}`、`{{DATE}}`、`{{ENGINE}}` 占位符。若脚本不可用，手动从 `assets/templates/` 复制模板。
 

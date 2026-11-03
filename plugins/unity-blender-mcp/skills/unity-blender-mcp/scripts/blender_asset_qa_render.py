@@ -28,6 +28,13 @@ import sys
 
 from mathutils import Vector
 
+# bpy 必须在模块级可见：mesh_objects/world_bounds/feet_on_ground/render_settings 都从
+# 模块全局里找它。以前只在 __main__ 里 import，走 exec() 粘贴或 import 时就直接 NameError。
+try:
+    import bpy
+except ImportError:  # 非 Blender 环境下允许被静态分析/测试导入
+    bpy = None
+
 
 # ---------------- 场景工具 ----------------
 
@@ -204,7 +211,14 @@ def setup_camera(center, size, az_deg, el_deg, lens, res_x, res_y, bounds_objs=N
 
 def render_settings(res_x, res_y, samples):
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE"
+    # EEVEE 的引擎标识符在 4.2 改名：4.2–4.5 是 BLENDER_EEVEE_NEXT，5.0+ 才回到
+    # BLENDER_EEVEE。写死 "BLENDER_EEVEE" 在 4.2–4.5 会直接抛 TypeError。
+    for engine in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
+        try:
+            scene.render.engine = engine
+            break
+        except TypeError:
+            continue
     scene.render.resolution_x = res_x
     scene.render.resolution_y = res_y
     scene.render.resolution_percentage = 100
@@ -235,7 +249,6 @@ def render_settings(res_x, res_y, samples):
 
 def qa_render(out_path, hdri=None, res=(1920, 1080), az=42, el=14, lens=45,
              samples=128, turntable=1, import_mode=False):
-    import bpy
     objs = mesh_objects()
     if not objs:
         raise RuntimeError("场景里没有网格，无法渲染")
@@ -351,15 +364,33 @@ def main():
         print("QA_RENDER_DONE %s" % out)
 
 
-if __name__ == "__main__":
-    import bpy  # noqa: E402
-    main()
+def _run_and_exit():
+    """CLI 入口：任何异常都要变成非零退出码。
 
-# MCP 插件 exec 时不注入 __name__/__file__，兜底直接渲染当前场景
-try:
-    _name = __name__  # noqa: F821
-except NameError:
-    import bpy  # noqa: F401
-    import os
-    _out = os.path.join(os.environ.get("TEMP", os.path.expanduser("~")), "qa_render.png")
-    qa_render(_out, import_mode=False)
+    Blender 的 --python-exit-code 默认是 0，异常只会打印 traceback 然后照样退 0，
+    调用方（尤其是 CI / Agent）无法区分"渲染成功"和"炸了"。
+    """
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as exc:  # noqa: BLE001 - 必须捕获一切才能保证退出码
+        import traceback
+        traceback.print_exc()
+        print("[错误] 质检渲染失败：%s" % exc)
+        sys.exit(1)
+
+
+def _mcp_entry():
+    """MCP execute_blender_code 粘贴模式：没有 __name__/argv，直接渲染当前场景。"""
+    out = os.path.join(os.environ.get("TEMP", os.path.expanduser("~")), "qa_render.png")
+    qa_render(out, import_mode=False)
+    print("QA_RENDER_DONE %s" % out)
+
+
+if __name__ == "__main__":
+    _run_and_exit()
+else:
+    # 被 exec() 粘贴执行时 __name__ 不存在，走兜底；被正常 import 时什么都不做。
+    if globals().get("__name__") is None:
+        _mcp_entry()

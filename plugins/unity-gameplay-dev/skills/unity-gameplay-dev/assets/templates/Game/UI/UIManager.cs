@@ -46,6 +46,32 @@ namespace {{NS}}
                 return null;
             }
 
+            // 已经打开的直接返回，不要重复入栈。
+            // 否则连续 Open<T>() 会推入同一个面板两次，返回键永远关不掉它。
+            if (_stack.Count > 0 && _stack.Peek() == panel)
+            {
+                return (T)panel;
+            }
+
+            // 栈里已有该面板（深层重复打开）：先把它从栈中移除，避免重复引用
+            if (_stack.Contains(panel))
+            {
+                var tmp = new Stack<UIPanel>();
+                while (_stack.Count > 0)
+                {
+                    var p = _stack.Pop();
+                    if (p != panel)
+                    {
+                        tmp.Push(p);
+                    }
+                }
+                while (tmp.Count > 0)
+                {
+                    _stack.Push(tmp.Pop());
+                }
+                panel.Close();
+            }
+
             if (_stack.Count > 0)
             {
                 _stack.Peek().Close();

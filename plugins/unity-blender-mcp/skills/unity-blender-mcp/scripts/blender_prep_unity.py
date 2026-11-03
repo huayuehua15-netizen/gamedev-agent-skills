@@ -39,14 +39,36 @@ def _mesh_objects(objs):
     return [o for o in objs if o.type in ("MESH", "ARMATURE", "EMPTY")]
 
 
+def _is_skinned(obj):
+    """判断网格是否被骨架驱动。
+
+    不能用 `parent_type == "ARMATURE"`：那是几乎没人用的旧式父级变形。
+    正常的蒙皮网格是普通 OBJECT 父级 + Armature 修改器（FBX/glTF 导入默认如此）。
+    """
+    if any(m.type == "ARMATURE" for m in obj.modifiers):
+        return True
+    return bool(obj.type == "MESH" and obj.find_armature())
+
+
 def apply_transforms(objs):
-    """应用旋转与缩放（位置不应用）。"""
+    """应用旋转与缩放（位置不应用）。
+
+    逐个对象处理：带形态键（shape keys）或多用户网格数据的对象会让
+    transform_apply 抛 RuntimeError，批量调用时一个坏对象会中断整批，
+    而且此时选区已经被改过了。
+    """
     bpy.context.view_layer.update()  # 直接赋值过 scale/rotation 时必须先刷新依赖图
     bpy.ops.object.select_all(action="DESELECT")
     for o in objs:
-        if o.type in ("MESH", "ARMATURE"):
-            o.select_set(True)
-    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        if o.type not in ("MESH", "ARMATURE"):
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        try:
+            bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        except RuntimeError as exc:
+            print("[警告] 跳过应用变换 %s：%s（常见于形态键/多用户网格）" % (o.name, exc))
 
 
 def recalc_normals(objs):
@@ -100,7 +122,7 @@ def set_origins(objs, mode="GEOMETRY"):
 
     # GEOMETRY（道具）：蒙皮网格不单独动原点
     for o in meshes:
-        if o.parent and o.parent_type == "ARMATURE":
+        if _is_skinned(o):
             continue
         bpy.context.view_layer.objects.active = o
         bpy.ops.object.origin_set(type="ORIGIN_GEOMETRY", center="BOUNDS")
@@ -136,9 +158,11 @@ def prep_and_export(out_path, anim=False, objs=None, origin="GEOMETRY",
         bpy.context.view_layer.objects.active = objs[0]
 
     # 1. 清理未选中的杂项（仅 CLI 模式）
+    #    只删相机和灯光。空物体（EMPTY）通常是 FBX/glTF/Sketchfab 的层级根节点，
+    #    删掉会让子物体按局部变换跳位——那是"模型导入后位置全乱"的头号原因。
     if clean:
         for o in list(bpy.context.scene.objects):
-            if o not in objs and o.type in ("CAMERA", "LIGHT", "EMPTY"):
+            if o not in objs and o.type in ("CAMERA", "LIGHT"):
                 bpy.data.objects.remove(o, do_unlink=True)
 
     # 2. 应用变换、修法线、归位原点
@@ -194,8 +218,12 @@ def prep_and_export(out_path, anim=False, objs=None, origin="GEOMETRY",
             bake_anim=False,
             **common)
 
+    # 清理孤儿数据放在导出之前：放在之后一旦抛异常，FBX 已经落盘却会漏掉
+    # 成功信息和体积校验，调用方看到 traceback 会误以为导出失败了。
     purge_orphans()
     size = os.path.getsize(out_path) if os.path.isfile(out_path) else 0
+    if size <= 0:
+        raise RuntimeError("导出后没有找到有效的 FBX：%s" % out_path)
     msg = (f"已导出 {out_path}（{size/1024:.0f} KB）\n"
            f"对象：{names}\n动画：{'烘焙' if anim else '不烘焙'}\n"
            f"轴向：-Z forward / Y up；global_scale=1；add_leaf_bones=False；use_tspace=True")
@@ -231,10 +259,24 @@ def main():
                     normalize_names=False, clean=True)
 
 
+def run_cli():
+    """CLI 入口：异常必须变成非零退出码，否则"导出失败"和"导出成功"分不出来。"""
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as exc:  # noqa: BLE001
+        import traceback
+        traceback.print_exc()
+        print("[错误] 导出失败：%s" % exc)
+        return 1
+    return 0
+
+
 try:
     _name = __name__  # 兼容 MCP 插件 exec 时未注入 __name__ 的情况
 except NameError:
     _name = ""
 
 if _name == "__main__":
-    main()
+    sys.exit(run_cli())

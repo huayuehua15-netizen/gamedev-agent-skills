@@ -63,7 +63,11 @@ def audit_mesh(obj, budget_tris=None, require_bevel=False):
 
     scale = tuple(round(v, 4) for v in obj.scale)
     scale_ok = all(abs(s - 1.0) < 1e-4 for s in scale)
-    rotation = tuple(round(v, 6) for v in obj.rotation_euler)
+    # FBX/glTF 导入默认是 QUATERNION 模式，此时 rotation_euler 恒为 0。
+    if obj.rotation_mode == "QUATERNION":
+        rotation = tuple(round(v, 6) for v in obj.rotation_quaternion.to_euler())
+    else:
+        rotation = tuple(round(v, 6) for v in obj.rotation_euler)
 
     bevel_mods = [m.type for m in obj.modifiers if m.type == "BEVEL"]
     # 倒角权重：5.x 是 float 自定义层 "bevel_weight_edge"；旧版为 BMEdge.bevel_weight 属性
@@ -78,8 +82,17 @@ def audit_mesh(obj, budget_tris=None, require_bevel=False):
     has_uv = len(me.uv_layers) > 0
     materials = [m.name if m else None for m in me.materials]
 
-    # 三角面总数（用于引擎面数预算）
-    tri_count = n_face_loops - 2 * n_f
+    # 三角面总数（用于引擎面数预算）。
+    # 必须按"求值后"的网格算：FBX 导出走的是 use_mesh_modifiers=True，
+    # 带 Bevel/Subsurf 的模型按基础网格算会严重低报——而 --require-bevel 恰好
+    # 在鼓励挂 Bevel 修改器，两者原本是互相打脸的。
+    evaluated = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    eval_mesh = evaluated.to_mesh()
+    try:
+        tri_count = sum(max(len(p.vertices) - 2, 0) for p in eval_mesh.polygons)
+        base_tri_count = n_face_loops - 2 * n_f
+    finally:
+        evaluated.to_mesh_clear()
 
     dims = tuple(round(v, 4) for v in obj.dimensions)
 
@@ -101,8 +114,10 @@ def audit_mesh(obj, budget_tris=None, require_bevel=False):
     if require_bevel and bevel_missing and n_v > 8:
         problems.append("硬表面资产未发现倒角（bevel 修改器/倒角权重均无）：硬边在引擎里不会反光，显廉价")
     if budget_tris is not None and tri_count > budget_tris:
-        problems.append("三角面 %d 超预算 %d" % (tri_count, budget_tris))
-    if min_area is not None and min_area < 1e-8:
+        problems.append("三角面 %d 超预算 %d（已计入修改器；基础网格 %d）"
+                        % (tri_count, budget_tris, base_tri_count))
+    # 极小面按世界尺度判断：局部尺度很小的对象会把未应用的缩放算进面积，误报
+    if min_area is not None and min_area < 1e-8 and scale_ok:
         problems.append("存在极小面（最小面积 %.2e），可能是穿插/重复顶点" % min_area)
 
     bm.free()
@@ -112,6 +127,7 @@ def audit_mesh(obj, budget_tris=None, require_bevel=False):
         "verts": n_v, "edges": n_e, "faces": n_f,
         "tris": tris, "quads": quads, "ngons": ngons,
         "tri_count": tri_count,
+        "tri_count_base_mesh": base_tri_count,
         "boundary_edges": boundary_edges,
         "non_manifold_edges_sample": non_manifold_edges,
         "loose_vert_count": len(loose_verts),
@@ -153,17 +169,49 @@ def main():
     args = _argv()
     blend = next((a for a in args if a.endswith(".blend")), None)
     if blend:
-        bpy.ops.wm.open_mainfile(filepath=blend)
+        if not os.path.isfile(blend):
+            print("[错误] 找不到 .blend 文件：%s" % blend)
+            sys.exit(2)
+        try:
+            bpy.ops.wm.open_mainfile(filepath=blend)
+        except RuntimeError as exc:
+            print("[错误] 打开文件失败：%s" % exc)
+            sys.exit(2)
+
     budget = None
     if "--budget-tris" in args:
-        budget = int(args[args.index("--budget-tris") + 1])
+        pos = args.index("--budget-tris")
+        if pos + 1 >= len(args):
+            print("[错误] --budget-tris 缺少数值")
+            sys.exit(2)
+        try:
+            budget = int(args[pos + 1])
+        except ValueError:
+            print("[错误] --budget-tris 需要整数，收到：%r" % args[pos + 1])
+            sys.exit(2)
+        if budget <= 0:
+            print("[错误] --budget-tris 必须为正数，收到：%d" % budget)
+            sys.exit(2)
+
     selection_only = "--selection-only" in args
     include_refs = "--include-refs" in args
     require_bevel = "--require-bevel" in args
+
     report = audit_scene(budget, selection_only, include_refs, require_bevel)
+
+    # 空目标集不等于"通过"。--background 下 --selection-only 选不中任何东西，
+    # 旧的写法会打印"0 个网格，0 个有问题"并退 0——一次什么都没检查的绿灯。
+    if not report:
+        hint = "（--selection-only 在 --background 下通常选不中对象，去掉该参数）" \
+            if selection_only else ""
+        print("[错误] 没有可审计的 MESH 对象%s" % hint)
+        sys.exit(2)
+
     print(json.dumps(report, ensure_ascii=False, indent=2))
     failed = [r for r in report if not r["pass"]]
     print("[审计] %d 个网格，%d 个有问题" % (len(report), len(failed)))
+    for r in failed:
+        print("  - %s: %s" % (r["name"], "; ".join(r["problems"])))
     sys.exit(1 if failed else 0)
 
 

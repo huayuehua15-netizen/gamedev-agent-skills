@@ -43,7 +43,8 @@
 | 远景/背景 | >8m | 256–384 px/m | 512 atlas |
 | 移动端/低配 | 全局 | 256–512 px/m | 减半 |
 
-> 1024px/m 意味着 1 米的面在 UV 里占满 1024 像素；0.5m 椅子用 1024 图密度即翻倍。同一套场景内密度保持一致，不要一个 2048 一个 256。
+> 这张表是**全项目 texel density 的唯一口径**（GDD 侧 `08-prop-modeling.md` 引用同一张表，不再单独给"全局 1024px/m"这种与之冲突的数字）。
+> 1024px/m 意味着 1 米的面在 UV 里占满 1024 像素；0.5m 的椅子若给 1024 图，密度会翻倍到 2048px/m，所以小件要么减图、要么提分辨率。同一场景内密度保持一致，不要一个 2048 一个 256。
 
 ### 检查方法
 - Blender UV 编辑器中用 Checker Map（编号格/数字格）显示密度，全岛格子大小一致为合格。
@@ -53,10 +54,17 @@
 
 需要的贴图（URP）：
 - **Normal（法线）**：高模凹凸到低模；存 Non-Color。
-- **AO（环境光遮蔽，可合并到 RMA 的 B 或单独乘底色）**：缝隙脏污基础。
+- **AO（环境光遮蔽，可并入 AO 通道或单独乘底色）**：缝隙脏污基础。
 - **Curvature（曲率，用于边缘磨损）**：生成遮罩给掉漆/磨损效果用。
 - **Base Color**：纯色或绘制的颜色层；贴图细节（污渍、掉漆、色差）画在这。
-- **RMA**（R=Metallic、G=Roughness、B=AO）打包；Non-Color。
+- **RMA**（R=**Roughness**、G=**Metallic**、B=**AO**）打包；Non-Color。
+
+> 三种打包约定互不相同，**全项目只能选一种**，并在技术文档里写死：
+> - **ORM**（glTF/UE 标准）：R=AO、G=Roughness、B=Metallic；
+> - **RMA**：R=Roughness、G=Metallic、B=AO（与 ORM 的 R/B 对调）；
+> - **Unity HDRP Mask Map**：R=Metallic、G=AO、B=Detail Mask、A=Smoothness。
+>
+> 上面 08 号资产规格文档与本表必须一致；改口径时两处一起改。
 
 烘焙要点：
 1. 低模 UV 完成、岛 padding 足够；高模在低模外侧 0–0.02m。
