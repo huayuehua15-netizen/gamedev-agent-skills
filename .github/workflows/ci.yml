@@ -241,3 +241,14 @@ jobs:
           test $rc -eq 2 || { echo "expected 2, got $rc"; exit 1; }
 
           echo "all gate exit codes correct"
+
+      - name: Full toolchain check (silhouette decisions, not just exit codes)
+        env:
+          BLENDER: blender
+        run: |
+          # check_toolchain.py rebuilds fixtures, runs every shipped gate and
+          # asserts the actual decisions: a matching asset must PASS with
+          # IoU>=0.85, a wrong-proportioned one must FAIL, typos must exit 2.
+          python3 -m pip install --quiet numpy
+          BLENDER="$(command -v blender)" python3 tools/check_toolchain.py
+

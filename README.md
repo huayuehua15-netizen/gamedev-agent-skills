@@ -71,7 +71,7 @@ blender --background --python-exit-code 1 --python plugins/blender-modeling-craf
 | 设计文档（`aaa-game-gdd`） | 完整 | 部分：帧动画规格（09）可直接用；场景/关卡按网格重写 |
 | 资产管线（`unity-blender-mcp`） | 完整 | 有限：`AssetPostprocessor.cs` 已加 Sprite 分支（自动按 2D 设置导入）；但素材库仍以 3D 为主 |
 | 建模（`blender-modeling-craft`） | 完整 | 不适用：Blender 不做像素画与贴片 |
-| 玩法代码（`unity-gameplay-dev`） | 完整 | **有专门文档** `references/11-2d-gameplay.md`：2D 包安装、Sprite 导入、Physics2D、2D 平台跳跃、Tilemap、像素完美、overdraw 预算。C# 模板里与维度无关的部分（事件总线/状态机/背包/存档/UI 栈/音频）可直接复用，控制器与导航需重写 |
+| 玩法代码（`unity-gameplay-dev`） | 完整 | **有专门文档** `references/11-2d-gameplay.md`：2D 包安装、Sprite 导入、Physics2D、Tilemap、像素完美、overdraw 预算。C# 模板里与维度无关的部分（事件总线/状态机/背包/存档/UI 栈/音频）可直接复用；**控制器已提供** `PlatformerController2D`（Rigidbody2D + coyote time + jump buffer），`--dimension 2d` 时自动生成并跳过 3D 专用文件。导航仍需自行实现（2D 用网格 A*，不是 NavMesh） |
 
 脚手架支持 `--dimension 2d`，会额外写入 `com.unity.2d.*` 包；`AssetPostprocessor.cs` 对
 `spr_*` / `*_spr` / `/Sprites/` / `/Tiles/` 下的图自动走 Sprite 导入，不会被 3D 贴图规则毁掉。

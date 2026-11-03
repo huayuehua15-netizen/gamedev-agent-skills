@@ -75,7 +75,7 @@ Stated plainly so nobody gets burned:
 | Design docs (`aaa-game-gdd`) | Complete | Partial: the frame-animation spec (09) is directly usable; scene/level docs need rewriting around a tile grid |
 | Asset pipeline (`unity-blender-mcp`) | Complete | Limited: `AssetPostprocessor.cs` has a Sprite branch that applies 2D import settings automatically, but the asset libraries are still 3D-oriented |
 | Modelling (`blender-modeling-craft`) | Complete | Not applicable: Blender is not where pixel art and sprites live |
-| Gameplay code (`unity-gameplay-dev`) | Complete | **Dedicated doc** `references/11-2d-gameplay.md`: 2D package setup, sprite import, Physics2D, 2D platforming, Tilemap, pixel-perfect camera, overdraw budgets. The dimension-agnostic C# (event bus / state machine / inventory / save / UI stack / audio) is reusable; controllers and navigation must be rewritten |
+| Gameplay code (`unity-gameplay-dev`) | Complete | **Dedicated doc** `references/11-2d-gameplay.md`: 2D package setup, sprite import, Physics2D, Tilemap, pixel-perfect camera, overdraw budgets. The dimension-agnostic C# (event bus / state machine / inventory / save / UI stack / audio) is reusable. **A controller is included**: `PlatformerController2D` (Rigidbody2D + coyote time + jump buffer), generated automatically by `--dimension 2d`, which also skips the 3D-only files. Navigation still has to be built (2D uses grid A*, not NavMesh) |
 
 The scaffolder supports `--dimension 2d`, which adds the `com.unity.2d.*` packages;
 `AssetPostprocessor.cs` routes anything under `spr_*` / `*_spr` / `/Sprites/` / `/Tiles/`
