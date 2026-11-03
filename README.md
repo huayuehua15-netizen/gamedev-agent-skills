@@ -3,6 +3,8 @@
 [![CI](https://github.com/huayuehua15-netizen/gamedev-agent-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/huayuehua15-netizen/gamedev-agent-skills/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+**简体中文** · [English](README.en.md)
+
 面向游戏开发的 AI 技能套件。四个技能，一个仓库，一套可执行的验收门禁。**3D 为主，2D 有专门的落地方案**（见下文「2D 支持边界」）。
 
 > 定位：让 AI 不做蠢事、交付能过检查的东西。
@@ -81,7 +83,8 @@ game-dev-skills/
 ├── marketplace.json              # ZCode / 自带市场清单
 ├── .claude-plugin/marketplace.json  # Claude Code 市场清单（build 生成）
 ├── LICENSE
-├── README.md                     # 本文件
+├── README.md                     # 本文件（中文）
+├── README.en.md                  # English version
 ├── CONTRIBUTING.md               # 贡献标准与提交前自检
 ├── CHANGELOG.md                  # 版本变更（含每个门禁缺陷的说明）
 ├── .gitattributes                # 统一换行，防跨平台 diff 污染
