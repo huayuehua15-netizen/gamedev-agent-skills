@@ -70,4 +70,16 @@ jobs:
         # 参数拼错必须报错而不是静默跳过门禁。
         env:
           BLENDER: blender
-        run: python3 tools/check_toolchain.py
+        run: |
+          set -o pipefail
+          python3 tools/check_toolchain.py 2>&1 | tee toolchain.out
+
+      - name: Upload toolchain report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolchain-report
+          path: |
+            _finalcheck/**
+            toolchain.out
+          if-no-files-found: ignore
