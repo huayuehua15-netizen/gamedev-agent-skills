@@ -71,8 +71,18 @@ jobs:
         env:
           BLENDER: blender
         run: |
-          set -o pipefail
-          python3 tools/check_toolchain.py 2>&1 | tee toolchain.out
+          set +e
+          python3 tools/check_toolchain.py > toolchain.out 2>&1
+          rc=$?
+          cat toolchain.out
+          if [ $rc -ne 0 ]; then
+            # Emit as an annotation so it is readable via the API without
+            # admin rights (job logs and artifacts both require auth).
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error::$line"
+            done < <(tail -n 40 toolchain.out)
+          fi
+          exit $rc
 
       - name: Upload toolchain report
         if: always()
