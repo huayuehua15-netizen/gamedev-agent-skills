@@ -107,6 +107,41 @@ def jload(s):
         return None
 
 
+def has_gl(tmpdir):
+    """CI 的 ubuntu runner 没有 GPU，Blender 的 Workbench/EEVEE 渲染需要一个
+    OpenGL 上下文，在那种环境下必然失败。这不是脚本缺陷，是环境限制。
+    用 BLENDER_SKIP_RENDER=1 或探测不到渲染能力时，只跑不依赖渲染的检查。
+
+    探测本身要写到真实存在的目录：早先写成 '/tmp/_glprobe.png'，
+    在 Windows 上这个路径不存在，于是渲染"失败"，被误判成"没有 GPU"。
+    """
+    if os.environ.get("BLENDER_SKIP_RENDER") == "1":
+        return False
+    probe_png = str(Path(tmpdir) / "_glprobe.png").replace("\\", "/")
+    probe = (
+        "import bpy\n"
+        "try:\n"
+        "    s = bpy.context.scene\n"
+        "    s.render.engine = 'BLENDER_WORKBENCH'\n"
+        "    s.render.resolution_x = s.render.resolution_y = 32\n"
+        f"    s.render.filepath = {probe_png!r}\n"
+        "    bpy.ops.render.render(write_still=True)\n"
+        "    print('GL_OK')\n"
+        "except Exception as e:\n"
+        "    print('GL_FAIL', type(e).__name__, e)\n"
+    )
+    r = subprocess.run(
+        [BLENDER, "--background", "--factory-startup", "--python-exit-code", "0",
+         "--python-expr", probe],
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return "GL_OK" in r.stdout
+
+
+RENDER_OK = has_gl(TMP)
+if not RENDER_OK:
+    print("NOTE: no usable OpenGL context (headless GPU-less runner).")
+    print("      Rendering-dependent checks will be skipped.\n")
+
 p = run(TMP / "build.py", [TMP])
 if "BUILT" not in p.stdout:
     print("fixture build FAILED"); print(p.stdout[-1200:]); print(p.stderr[-1200:]); sys.exit(1)
@@ -123,32 +158,37 @@ results.append(("topology: unapplied transform rejected", r.returncode == 1, f"e
 r = run(TOPOLOGY, [TMP / "nope.blend"])
 results.append(("topology: missing file exits 2", r.returncode == 2, f"exit={r.returncode}"))
 
-# --- silhouette gate -----------------------------------------------------
-r = run(GATE, [TMP / "good.blend", "--gate", "--stage", "final",
-               "--ref-front", TMP / "ref.png", "--outdir", TMP / "g1"])
-d = jload(r.stdout)
-iou = d["views"][0]["iou"] if d and d.get("views") else None
-ok = r.returncode == 0 and iou is not None and iou >= 0.85
-results.append(("silhouette: matching asset passes (IoU>=0.85)", ok, f"exit={r.returncode} iou={iou}"))
+# Everything below drives a render, so it needs a GL context.
+if RENDER_OK:
+    # --- silhouette gate -------------------------------------------------
+    r = run(GATE, [TMP / "good.blend", "--gate", "--stage", "final",
+                   "--ref-front", TMP / "ref.png", "--outdir", TMP / "g1"])
+    d = jload(r.stdout)
+    iou = d["views"][0]["iou"] if d and d.get("views") else None
+    ok = r.returncode == 0 and iou is not None and iou >= 0.85
+    results.append(("silhouette: matching asset passes (IoU>=0.85)", ok, f"exit={r.returncode} iou={iou}"))
 
-r = run(GATE, [TMP / "bad.blend", "--gate", "--stage", "final",
-               "--ref-front", TMP / "ref.png", "--outdir", TMP / "g2"])
-d = jload(r.stdout)
-iou = d["views"][0]["iou"] if d and d.get("views") else None
-ok = r.returncode == 1 and iou is not None and iou < 0.85
-results.append(("silhouette: wrong proportions rejected", ok, f"exit={r.returncode} iou={iou}"))
+    r = run(GATE, [TMP / "bad.blend", "--gate", "--stage", "final",
+                   "--ref-front", TMP / "ref.png", "--outdir", TMP / "g2"])
+    d = jload(r.stdout)
+    iou = d["views"][0]["iou"] if d and d.get("views") else None
+    ok = r.returncode == 1 and iou is not None and iou < 0.85
+    results.append(("silhouette: wrong proportions rejected", ok, f"exit={r.returncode} iou={iou}"))
 
+    # --- turntable still works ------------------------------------------
+    r = run(GATE, [TMP / "good.blend", "--outdir", TMP / "tt"])
+    imgs = list((TMP / "tt").glob("*.png")) if (TMP / "tt").exists() else []
+    results.append(("turntable: renders 4 views", r.returncode == 0 and len(imgs) == 4,
+                    f"exit={r.returncode} images={len(imgs)}"))
+
+# 参数校验在解析阶段就该失败，不需要渲染出图，所以放在渲染开关之外——
+# 这样即使 CI 没有 GL 上下文，也能验证"拼错参数不会被静默忽略"。
 r = run(GATE, [TMP / "good.blend", "--gate=1"])
 results.append(("silhouette: typo'd flag exits 2 (no silent skip)", r.returncode == 2, f"exit={r.returncode}"))
 
 r = run(GATE, [TMP / "good.blend", "--stage", "blockuot"])
 results.append(("silhouette: misspelled stage errors", r.returncode == 2, f"exit={r.returncode}"))
 
-# --- turntable still works ----------------------------------------------
-r = run(GATE, [TMP / "good.blend", "--outdir", TMP / "tt"])
-imgs = list((TMP / "tt").glob("*.png")) if (TMP / "tt").exists() else []
-results.append(("turntable: renders 4 views", r.returncode == 0 and len(imgs) == 4,
-                f"exit={r.returncode} images={len(imgs)}"))
 
 print()
 print("=" * 74)

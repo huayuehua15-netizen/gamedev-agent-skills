@@ -17,3 +17,16 @@ node_modules/
 _scaffold*/
 _scaffold_*/
 _finalcheck/
+
+# 本地调试临时文件（勿提交）
+_runs.json
+_r*.json
+_j*.json
+_a*.json
+_dj.json
+_img.md
+_winlog.txt
+_glprobe.py
+_permtest/
+_2dverify/
+_3dcheck/
