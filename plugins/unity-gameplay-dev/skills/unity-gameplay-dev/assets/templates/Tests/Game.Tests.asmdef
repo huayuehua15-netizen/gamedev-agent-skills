@@ -1,0 +1,22 @@
+{
+    "name": "{{NS}}.Tests",
+    "rootNamespace": "{{NS}}.Tests",
+    "references": [
+        "GUID:__GAME_ASMDEF_GUID__",
+        "GUID:__INPUT_GUID__"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false,
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ]
+}

@@ -1,0 +1,43 @@
+{
+  "name": "game-dev-skills",
+  "description": "面向 3D 游戏开发的 AI 技能套件：设计文档（GDD）、Unity + Blender 资产管线、Blender 建模手艺、Unity 玩法开发，带可执行的验收门禁。",
+  "pluginRoot": "plugins",
+  "plugins": [
+    {
+      "name": "aaa-game-gdd",
+      "source": "./aaa-game-gdd",
+      "description": "把模糊的游戏想法转成可交付开发的文档体系：愿景、美术圣经、场景关卡、玩法数值、叙事台词、交互 UI、角色、建模规格、动画、音频、性能预算、Steam 验收。含整套模板与脚手架。",
+      "version": "1.0.0",
+      "category": "game-dev",
+      "tags": ["game", "gdd", "game-design", "steam", "unity", "unreal", "godot"],
+      "strict": true
+    },
+    {
+      "name": "unity-blender-mcp",
+      "source": "./unity-blender-mcp",
+      "description": "通过 MCP 操作 Unity 与 Blender，以素材优先方式完成 3D 资产的搜索复用、审计清洗、FBX 导出、Unity 导入与验收（材质 / LOD / 碰撞 / 骨骼动画 / Prefab）。",
+      "version": "1.0.0",
+      "category": "game-dev",
+      "tags": ["game", "unity", "blender", "mcp", "3d", "assets", "fbx"],
+      "strict": true
+    },
+    {
+      "name": "blender-modeling-craft",
+      "source": "./blender-modeling-craft",
+      "description": "Blender 从零建模的手艺与验收：参考图驱动、真实尺寸、blockout、硬表面、有机重拓扑、拓扑 / UV / PBR、面数预算、剪影 IoU 门禁，直到资产可交接 Unity。",
+      "version": "1.0.0",
+      "category": "game-dev",
+      "tags": ["game", "blender", "modeling", "hard-surface", "topology", "pbr", "unity"],
+      "strict": true
+    },
+    {
+      "name": "unity-gameplay-dev",
+      "source": "./unity-gameplay-dev",
+      "description": "在 Unity 里把 GDD 落地为可玩功能：输入系统、第一人称控制器、交互、UGUI、背包 / 存档 / 对话、敌人 AI、音频、测试与构建，含一键脚手架和可编译模板。",
+      "version": "1.0.0",
+      "category": "game-dev",
+      "tags": ["game", "unity", "gameplay", "csharp", "mcp", "fps", "steam"],
+      "strict": true
+    }
+  ]
+}

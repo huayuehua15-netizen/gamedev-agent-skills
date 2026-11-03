@@ -1,0 +1,10 @@
+dist/
+__pycache__/
+*.py[cod]
+*.pyo
+.DS_Store
+Thumbs.db
+qa_render/
+*.qa.json
+.venv/
+node_modules/

@@ -1,0 +1,7 @@
+{
+  "name": "unity-gameplay-dev",
+  "version": "1.0.0",
+  "description": "让 AI 通过 MCP（或命令行）自主完成 Unity 3D 单机游戏的玩法逻辑开发：从 GDD 规格到可玩、可测试、可构建的代码。覆盖 Unity 6（6000.x，第一人称、URP、UGUI、新 Input System）下的项目脚手架与代码规范、输入系统、第一人称控制器、准星交互、Animator 状态机、UI 面板栈/HUD、背包/对话/存档/对象池/音频、NavMesh 敌人 AI、Profiler 性能定位、构建发布与测试。提供可直接编译运行的 C# 框架模板（带 asmdef 与测试）和一键脚手架脚本。",
+  "license": "MIT",
+  "skills": "./skills/"
+}

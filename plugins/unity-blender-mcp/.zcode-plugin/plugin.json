@@ -1,0 +1,8 @@
+{
+  "name": "unity-blender-mcp",
+  "version": "1.0.0",
+  "description": "通过 MCP 自主操作 Unity 与 Blender，完成 3D 游戏资产的搜索复用、建模、清洗、导出、导入与验收全流程（素材优先）。",
+  "license": "MIT",
+  "keywords": ["game", "unity", "blender", "mcp", "3d", "assets"],
+  "skills": "skills"
+}
