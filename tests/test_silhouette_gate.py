@@ -5,11 +5,22 @@
 """
 
 import importlib.util
+import io
 import os
 import sys
 import types
 
 import numpy as np
+
+# Windows 的默认控制台编码不是 UTF-8（常见 cp1252 / cp936 / cp437）。
+# qa_render 返回的 error 字段是中文，直接 print 会抛 UnicodeEncodeError，
+# 在 CI 上表现为"单元测试失败"而本地却正常。这里把标准输出包成 UTF-8。
+if hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(
+        sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+if hasattr(sys.stderr, "buffer"):
+    sys.stderr = io.TextIOWrapper(
+        sys.stderr.buffer, encoding="utf-8", errors="replace", line_buffering=True)
 
 # 用桩替换 Blender 模块，只加载 qa_render 里的纯数学部分
 sys.modules.setdefault("bpy", types.ModuleType("bpy"))
