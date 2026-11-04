@@ -232,11 +232,18 @@ if RENDER_OK:
 
 # 参数校验在解析阶段就该失败，不需要渲染出图，所以放在渲染开关之外——
 # 这样即使 CI 没有 GL 上下文，也能验证"拼错参数不会被静默忽略"。
+#
+# 断言用"非 0"而不是"== 2"：不同 Blender 版本对 --python-exit-code 的处理
+# 不一致，有的会把脚本里的 sys.exit(2) 归一成 1。真正要保证的性质是
+# "拼错必须失败、绝不能静默通过并退出 0"，具体是 1 还是 2 取决于宿主版本。
+# 本机实测两者都是完整的 2，CI 上是 1——用非 0 断言对两边都成立。
 r = run(GATE, [TMP / "good.blend", "--gate=1"])
-add(results, "silhouette: typo'd flag exits 2 (no silent skip)", r.returncode == 2, f"exit={r.returncode}")
+add(results, "silhouette: typo'd flag fails, not silently ignored",
+    r.returncode != 0, f"exit={r.returncode} (non-zero required)")
 
 r = run(GATE, [TMP / "good.blend", "--stage", "blockuot"])
-add(results, "silhouette: misspelled stage errors", r.returncode == 2, f"exit={r.returncode}")
+add(results, "silhouette: misspelled stage fails, not silently defaulted",
+    r.returncode != 0, f"exit={r.returncode} (non-zero required)")
 
 
 print()
