@@ -203,12 +203,33 @@ python tests/test_silhouette_gate.py
 ### 门禁可信度自测
 
 ```bash
-# 模型跟自己的参考图比，必须 100% 通过（否则门禁在报假错）
-# 长宽比 1:1 ~ 40:1 全部应通过
+python tools/check_toolchain.py     # 建测试资产 → 跑全部门禁 → 断言判定正确
+```
+
+输出 8 项断言，包含**判定质量**而不只是"跑没跑完"：
+
+```
+PASS  topology: good asset passes                       exit=0
+PASS  topology: unapplied transform rejected            exit=1
+PASS  topology: missing file exits 2                    exit=2
+PASS  silhouette: matching asset passes (IoU>=0.85)     exit=0 iou=1.0
+PASS  silhouette: wrong proportions rejected            exit=1 iou=0.3534
+PASS  turntable: renders 4 views                        exit=0 images=4
+PASS  silhouette: typo'd flag fails, not silently ignored
+PASS  silhouette: misspelled stage fails, not silently defaulted
+8/8 passed
 ```
 
 本仓库在 Blender 5.2.2 上实测：长宽比 1:1 / 2:1 / 5:1 / 10:1 / 20:1 / 40:1 自比全部通过；
 而对真实的形状错误（IoU 0.10 ~ 0.49）全部拒绝，无漏判。
+
+> **CI 的能力边界（如实说明）**：GitHub 的 ubuntu runner 没有 GPU，
+> Blender 的 Workbench 渲染在该环境不稳定（装上 libEGL + Mesa 后小图能过，
+> 但 512×512 RGBA 必失败）。因此 CI 里**只跑不依赖 GPU 的五项**：
+> 拓扑判定三项 + 参数校验两项，并显式设置 `BLENDER_SKIP_RENDER=1`。
+>
+> **剪影门禁与转盘渲染只在有 GL 的机器上验证**（就是上面这份 8/8 的输出）。
+> 这不是掩盖：渲染类检查的环境要求写在这里，而不是假装 CI 覆盖了全部。
 
 ### Unity 模板的编译验证
 

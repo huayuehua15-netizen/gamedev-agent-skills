@@ -2,6 +2,57 @@
 
 本项目从 1.1.0 起按语义化版本记录。格式参考 Keep a Changelog。
 
+## [1.1.1] - 2026-11-04
+
+### 修复：CI 从未通过过
+
+从加入 CI 到 1.1.0 发行为止，**全部 20 次运行都是红的**。
+此前只在本机手工复刻各个步骤就认为没问题，这是错误的判断方式。
+以下是逐层挖出来的四个独立原因：
+
+1. **内联 heredoc 在 Windows 上不可用**。步骤里写了 `python - <<'PY'`，
+   而 windows-latest 的默认 shell 是 pwsh，不支持 heredoc；
+   且结束符在 YAML 块内缩进错位，在 Linux 上同样会挂。
+   现在所有检查都是 `tools/` 下的真实文件，CI 只负责调用。
+
+2. **PyYAML 被当成预装**。注释里写着 "PyYAML ships preinstalled"，
+   实际依赖步骤只装了 numpy，于是 ubuntu 的 frontmatter 校验直接 ImportError。
+   现在显式安装，且 `validate_skills.py` 在缺 PyYAML 时降级为模式匹配而不是崩溃。
+
+3. **脚本 print 中文在 Windows 控制台崩溃**。Windows 默认编码是
+   cp1252/cp936，`print("已写入 manifest.json…")` 会抛 UnicodeEncodeError，
+   脚手架直接挂掉——这正是 Windows 用户最常见的运行方式。
+   17 个脚本现在都带内联 UTF-8 守卫。
+   （守卫必须内联：Blender 用 `--python` 执行脚本时不把脚本目录加入
+   `sys.path`，`import _utf8` 会 ModuleNotFoundError。）
+
+4. **门禁参数校验的退出码断言过严**。本机 Blender 5.2 返回 2，
+   ubuntu 上的 Blender 返回 1——不同版本对 `--python-exit-code` 的归一化不同。
+   真正要保证的性质是"拼错必须失败、不能静默退出 0"，
+   所以断言改成非 0，并在标签里写明。
+
+### 修复：诊断能力
+
+失败时只报 `exit=1` 让人无从下手，而 GitHub 的 job 日志和 artifact
+都需要 admin 权限才能下载。现在：
+
+- `check_toolchain.py` 记录每个子进程的 stdout/stderr，失败时打印出来。
+- CI 把失败行以 `::error::` 注解形式输出，可通过公开 API 读取。
+- GL 探测按**真实分辨率**（512×512 RGBA）用图，而不是 32×32：
+  小图能过、大图失败，曾导致探测结果与实际检查不一致。
+- 参考剪影改用 numpy+zlib 合成，不再依赖渲染——
+  纯数学步骤不应该依赖 GPU。
+
+### 已知限制：CI 不跑渲染类检查
+
+GitHub 的 ubuntu runner 没有 GPU。即使装上 libegl1 / libgl1 / libgles2 /
+libgl1-mesa-dri / libosmesa6，Workbench 在这个环境里仍不稳定
+（能渲染小图，512×512 RGBA 必失败）。因此 CI 显式设 `BLENDER_SKIP_RENDER=1`，
+只验证不依赖 GPU 也必须正确的部分：拓扑判定三项 + 参数校验两项。
+
+剪影门禁与转盘渲染仍需在**有 GL 的环境**验证：
+`python tools/check_toolchain.py`（本机实测 8/8，IoU 1.0 通过 / 0.3534 拒绝）。
+
 ## [1.1.0] - 2026-11-03
 
 这一版的主题是**让门禁真的能拦住问题**，并修正会误导使用者的错误事实。

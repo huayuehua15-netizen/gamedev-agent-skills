@@ -224,14 +224,37 @@ How a silhouette is judged:
 ### Gate credibility self-test
 
 ```bash
-# A model compared against its own reference must pass 100% of the time,
-# otherwise the gate is reporting false failures.
-# Aspect ratios 1:1 through 40:1 should all pass.
+python tools/check_toolchain.py     # build fixtures -> run every gate -> assert the decisions
+```
+
+Eight assertions covering the *quality of the decisions*, not just that the
+scripts ran:
+
+```
+PASS  topology: good asset passes                       exit=0
+PASS  topology: unapplied transform rejected            exit=1
+PASS  topology: missing file exits 2                    exit=2
+PASS  silhouette: matching asset passes (IoU>=0.85)     exit=0 iou=1.0
+PASS  silhouette: wrong proportions rejected            exit=1 iou=0.3534
+PASS  turntable: renders 4 views                        exit=0 images=4
+PASS  silhouette: typo'd flag fails, not silently ignored
+PASS  silhouette: misspelled stage fails, not silently defaulted
+8/8 passed
 ```
 
 Measured on Blender 5.2.2: self-comparison passes at 1:1, 2:1, 5:1, 10:1, 20:1 and 40:1,
 while genuine shape errors (IoU 0.10 - 0.49) are all rejected. No false negatives,
 no leaks.
+
+> **What CI can and cannot do (stated plainly)**: GitHub's ubuntu runner has no GPU.
+> Blender's Workbench rendering is unreliable there — after installing libEGL and
+> Mesa, a small render succeeds but 512x512 RGBA always fails. So CI runs only the
+> **five checks that need no GPU**: three topology decisions plus two argument-validation
+> checks, with `BLENDER_SKIP_RENDER=1` set explicitly.
+>
+> **The silhouette gate and turntable renders are verified only on a machine with GL**
+> (that is where the 8/8 output above comes from). This is not hidden: the environment
+> requirement is stated here rather than pretending CI covers everything.
 
 ### Unity templates: compiled for real
 
