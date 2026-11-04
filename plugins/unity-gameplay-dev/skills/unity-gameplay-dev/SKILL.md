@@ -18,7 +18,8 @@ description: "让 AI 通过 MCP（或命令行）自主完成 Unity 3D 单机游
 
 - **做**：玩法逻辑、控制器、交互、UI、背包/对话/存档、AI、音频、测试、构建与性能定位。
 - **不做**：3D 资产制作/导入/材质（交给 unity-blender-mcp 技能）；多人联机（Netcode）；Shader 手写（仅给特效选型建议）。
-- 目标项目用第一人称；第三人称/俯视角沿用同一套架构（状态机、输入、交互、UI 不变），仅控制器与相机分支不同，见 `references/02`。
+- **三种 3D 视角都有现成控制器**：第一人称 `FirstPersonController`、第三人称 `ThirdPersonController`、俯视角/双摇杆 `TopDownController`。状态机、输入、交互、UI、存档完全不变，只换控制器与相机；选型与差异见 `references/02` §6。
+  **选错会直接毁手感**：第三人称的移动方向必须相对相机水平面，俯视角则必须相对世界坐标——两者的输入投影方式正好相反。
 - **2D 项目**：架构层（状态机/事件总线/存档/背包/UI 栈）照用，但角色控制、物理、导航、性能预算必须换，
   见 `references/11-2d-gameplay.md`。不要拿 3D 的 `CharacterController` + `NavMesh` 去做 2D。
 
@@ -88,7 +89,7 @@ python scripts/new_gameplay.py --out "D:/MyProject/Assets/Game" --namespace MyGa
 |---|---|---|
 | Core | `PersistentSingleton` / `StateMachine` / `EventBus` / `GameManager` / `GameEvents` | 单例、状态机、事件总线、游戏流程（菜单/游戏/暂停/加载） |
 | Input | `InputReader` | 新 Input System 代码化封装，键鼠+手柄 |
-| Player | `FirstPersonController` / `PlayerLook` / **`PlatformerController2D`** | 3D：CharacterController 移动、鼠标视角、跑跳蹲。2D：Rigidbody2D 平台跳跃（含 coyote time / jump buffer / 可变跳跃高度） |
+| Player | `FirstPersonController` / `PlayerLook` / **`ThirdPersonController`** / **`TopDownController`** / **`PlatformerController2D`** | **三种 3D 视角 + 2D 平台跳跃**，见 `references/02` §6 选型表：第一人称（输入相对自身）、第三人称（相对相机水平面）、俯视角/双摇杆（世界坐标，可移动与瞄准解耦）；2D 用 Rigidbody2D |
 | Interaction | `InteractableBase` / `Interactor` / `PickupItem` | 准星交互、拾取示例 |
 | Systems | `Health` / `Inventory` / `SaveSystem` / `DialogueRunner` / `ObjectPool` / `AudioManager` | 生命、背包、JSON 存档、线性对话、对象池、音频 |
 | AI | `EnemyAI` / `EnemyPerception` | NavMesh 巡逻/追击/攻击状态机 + 视锥感知 |
@@ -99,7 +100,7 @@ python scripts/new_gameplay.py --out "D:/MyProject/Assets/Game" --namespace MyGa
 
 - `references/00-mcp-code-workflow.md`：MCP 47 个工具按玩法任务映射、编辑循环、Play 验证、测试、无 MCP 降级
 - `references/01-architecture.md`：目录结构、asmdef、命名规范、数据驱动、引用/事件/单例使用边界、ScriptableObject
-- `references/02-input-and-fp-controller.md`：Input System 落地、Player 预制体层级、第一人称移动视角参数表、第三人称/俯视分支
+- `references/02-input-and-fp-controller.md`：Input System 落地、Player 预制体层级、移动视角参数表、**三种视角选型（第一/第三/俯视双摇杆）与各自的手感陷阱**
 - `references/03-interaction-animation.md`：交互层、Animator 状态机/Blend Tree/根运动、动画事件、Humanoid 对接
 - `references/04-ui-ugui.md`：Canvas/EventSystem 搭建、面板栈、HUD、暂停、输入切换
 - `references/05-gameplay-systems.md`：血量/背包/对话/存档/对象池的使用与扩展规范、数据定义

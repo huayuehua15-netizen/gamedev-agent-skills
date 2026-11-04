@@ -235,6 +235,8 @@ def deterministic_guid(seed):
 FILES_3D_ONLY = {
     "Player/FirstPersonController.cs",
     "Player/PlayerLook.cs",
+    "Player/ThirdPersonController.cs",
+    "Player/TopDownController.cs",
     "AI/EnemyAI.cs",
     "AI/EnemyPerception.cs",
     "Interaction/Interactor.cs",
