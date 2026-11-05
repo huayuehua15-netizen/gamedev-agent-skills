@@ -1,6 +1,6 @@
 {
   "name": "blender-modeling-craft",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "解决大模型从零做 3D 模型质量差的问题：Blender 建模手艺 + 多角度渲染自检 + Unity 游戏化交付。涵盖参考图驱动建模、真实尺寸比例（含 1.7m 人体标尺）、blockout 体量、硬表面（盒建模/卡线/倒角/布尔/细分曲面）、有机雕塑与重拓扑、游戏级拓扑（四边面/边流/极）、UV 与 texel density、PBR 材质与法线烘焙、面数预算与 LOD、剪影 IoU 门禁（正交渲染与参考图比对比例，不过不许导出）+ 多机位质检渲染人审、FBX 导出 Unity 交接。",
   "license": "MIT",
   "skills": "./skills/"

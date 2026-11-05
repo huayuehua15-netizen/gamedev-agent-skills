@@ -8,25 +8,25 @@
       "name": "aaa-game-gdd",
       "source": "./plugins/aaa-game-gdd",
       "description": "3A 级 3D 游戏开发文档（GDD）设计与审校技能：把模糊的游戏想法转化为可直接交付开发、达到 Steam 上架标准、对标 3A 大作的完整文档体系。覆盖游戏愿景与 Pitch、美术圣经、场景与关卡描述、主线玩法与系统数值、剧情叙事与台词脚本、交互与 UI/UX、角色设定、物品/道具建模规格、动画与帧动画规格、音频设计、技术架构与性能预算、QA 与 Steam 上架验收。当用户要写游戏策划案、GDD、游戏设计文档、场景/关卡/玩法/台词/交互/建模/动画规格、美术需求单，或需要审校游戏文档是否达到可开发、可上架、对标 3A 的质量时使用。",
-      "version": "1.0.0"
+      "version": "1.2.0"
     },
     {
       "name": "blender-modeling-craft",
       "source": "./plugins/blender-modeling-craft",
       "description": "解决大模型从零做 3D 模型质量差的问题：Blender 建模手艺 + 多角度渲染自检 + Unity 游戏化交付。涵盖参考图驱动建模、真实尺寸比例（含 1.7m 人体标尺）、blockout 体量、硬表面（盒建模/卡线/倒角/布尔/细分曲面）、有机雕塑与重拓扑、游戏级拓扑（四边面/边流/极）、UV 与 texel density、PBR 材质与法线烘焙、面数预算与 LOD、剪影 IoU 门禁（正交渲染与参考图比对比例，不过不许导出）+ 多机位质检渲染人审、FBX 导出 Unity 交接。",
-      "version": "1.0.0"
+      "version": "1.2.0"
     },
     {
       "name": "unity-blender-mcp",
       "source": "./plugins/unity-blender-mcp",
       "description": "通过 MCP 自主操作 Unity 与 Blender，完成 3D 游戏资产的搜索复用、建模、清洗、导出、导入与验收全流程。核心原则是素材优先：优先从 MCP 内置素材源（Sketchfab、Poly Haven）与外部素材库（3d66 等国内站、TurboSquid、CGTrader、Kenney、Quaternius、Mixamo、AI 生成等）搜索复用现成资产，搜不到再在 Blender 自建。",
-      "version": "1.0.0"
+      "version": "1.2.0"
     },
     {
       "name": "unity-gameplay-dev",
       "source": "./plugins/unity-gameplay-dev",
       "description": "让 AI 通过 MCP（或命令行）自主完成 Unity 3D 单机游戏的玩法逻辑开发：从 GDD 规格到可玩、可测试、可构建的代码。覆盖 Unity 6（6000.x，第一人称、URP、UGUI、新 Input System）下的项目脚手架与代码规范、输入系统、第一人称控制器、准星交互、Animator 状态机、UI 面板栈/HUD、背包/对话/存档/对象池/音频、NavMesh 敌人 AI、Profiler 性能定位、构建发布与测试。提供可直接编译运行的 C# 框架模板（带 asmdef 与测试）和一键脚手架脚本。",
-      "version": "1.0.0"
+      "version": "1.2.0"
     }
   ]
 }

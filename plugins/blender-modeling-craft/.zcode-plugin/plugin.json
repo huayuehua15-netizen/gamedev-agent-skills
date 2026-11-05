@@ -1,8 +1,18 @@
 {
   "name": "blender-modeling-craft",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "解决大模型从零 3D 建模质量差的手艺技能：参考图驱动、真实尺寸与 1.7m 人体标尺、blockout 体量、硬表面卡线倒角、有机雕塑重拓扑、游戏级拓扑/UV/PBR、面数预算与 LOD、剪影 IoU 门禁与多机位渲染人审，直到资产游戏就绪可交接 Unity。",
   "license": "MIT",
-  "keywords": ["game", "blender", "3d", "modeling", "hard-surface", "topology", "pbr", "unity", "steam"],
+  "keywords": [
+    "game",
+    "blender",
+    "3d",
+    "modeling",
+    "hard-surface",
+    "topology",
+    "pbr",
+    "unity",
+    "steam"
+  ],
   "skills": "skills"
 }

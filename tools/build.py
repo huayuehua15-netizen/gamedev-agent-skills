@@ -33,6 +33,23 @@ REL_SKILLS = "skills/game-dev"  # 安装到项目内时的相对位置
 IGNORE = shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store")
 
 
+def project_version():
+    """版本号的唯一来源：CHANGELOG 里最新的版本标题。
+
+    早先这里硬编码 "1.0.0"，导致内容已经到 1.2.0 而所有清单仍写着 1.0.0——
+    插件市场会显示过期版本。让生成器从 CHANGELOG 读，就只有一个地方要维护。
+    读不到时返回 0.0.0 并告警，而不是假装 1.0.0。
+    """
+    changelog = ROOT / "CHANGELOG.md"
+    if changelog.is_file():
+        text = changelog.read_text(encoding="utf-8")
+        m = re.search(r"^##\s*\[(\d+\.\d+\.\d+)\]", text, re.M)
+        if m:
+            return m.group(1)
+    print("[警告] 无法从 CHANGELOG.md 解析版本号，回退为 0.0.0")
+    return "0.0.0"
+
+
 def read_skill(skill_dir):
     text = (skill_dir / "SKILL.md").read_text(encoding="utf-8")
     if not text.startswith("---"):
@@ -97,13 +114,14 @@ def build_generic(skills):
 
 def build_claude(skills):
     """Claude Code 的清单必须落在仓库根目录，才能用 /plugin marketplace add <git-url>。"""
+    ver = project_version()
     for plugin in sorted({s["plugin"] for s in skills}):
         pdir = PLUGINS / plugin
         (pdir / ".claude-plugin").mkdir(parents=True, exist_ok=True)
         desc = next((s["description"] for s in skills if s["plugin"] == plugin), "")
         manifest = {
             "name": plugin,
-            "version": "1.0.0",
+            "version": ver,
             "description": short(desc, 300),
             "license": "MIT",
             "skills": "./skills/",
@@ -121,7 +139,7 @@ def build_claude(skills):
             "name": skill["plugin"],
             "source": "./plugins/%s" % skill["plugin"],
             "description": short(skill["description"], 300),
-            "version": "1.0.0",
+            "version": ver,
         })
     marketplace = {
         "name": "game-dev-skills",

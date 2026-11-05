@@ -1,8 +1,14 @@
 {
   "name": "aaa-game-gdd",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "3A 级 3D 游戏开发文档（GDD）设计与审校技能：把模糊游戏想法转化为可直接交付开发、达到 Steam 上架标准、对标 3A 大作的完整文档体系。",
   "license": "MIT",
-  "keywords": ["game", "gdd", "game-design", "steam", "3a"],
+  "keywords": [
+    "game",
+    "gdd",
+    "game-design",
+    "steam",
+    "3a"
+  ],
   "skills": "skills"
 }

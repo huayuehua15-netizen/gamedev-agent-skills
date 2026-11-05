@@ -1,8 +1,15 @@
 {
   "name": "unity-gameplay-dev",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "让 AI 通过 MCP 自主完成 Unity 3D 单机游戏玩法逻辑开发：从 GDD 规格到可玩、可测试、可构建的代码（第一人称、Unity 6、URP、UGUI、新 Input System）。",
   "license": "MIT",
-  "keywords": ["game", "unity", "gameplay", "csharp", "mcp", "fps"],
+  "keywords": [
+    "game",
+    "unity",
+    "gameplay",
+    "csharp",
+    "mcp",
+    "fps"
+  ],
   "skills": "skills"
 }

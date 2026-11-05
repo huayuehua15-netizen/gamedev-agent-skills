@@ -64,6 +64,39 @@ def main() -> int:
     if len(zips) != len(SKILLS):
         bad.append(f"expected {len(SKILLS)} upload zips, found {len(zips)}")
 
+    # 版本号必须与 CHANGELOG 一致。曾经十个清单全部停在 1.0.0，
+    # 而内容已经到 1.2.0，插件市场会显示过期版本。
+    import json
+    import re
+    cl = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    m = re.search(r"^##\s*\[(\d+\.\d+\.\d+)\]", cl, re.M)
+    if not m:
+        bad.append("cannot parse version from CHANGELOG.md")
+    else:
+        want = m.group(1)
+        manifests = [ROOT / "marketplace.json",
+                     ROOT / ".claude-plugin" / "marketplace.json"]
+        manifests += sorted(ROOT.glob("plugins/*/.claude-plugin/plugin.json"))
+        manifests += sorted(ROOT.glob("plugins/*/.zcode-plugin/plugin.json"))
+        for mp in manifests:
+            if not mp.is_file():
+                bad.append(f"missing manifest: {mp.relative_to(ROOT)}")
+                continue
+            try:
+                d = json.loads(mp.read_text(encoding="utf-8"))
+            except Exception as exc:
+                bad.append(f"invalid JSON in {mp.relative_to(ROOT)}: {exc}")
+                continue
+            versions = set()
+            if "version" in d:
+                versions.add(d["version"])
+            for p in d.get("plugins", []):
+                if "version" in p:
+                    versions.add(p["version"])
+            if versions and versions != {want}:
+                bad.append(f"{mp.relative_to(ROOT)}: version {sorted(versions)} "
+                           f"!= CHANGELOG {want}")
+
     if bad:
         for b in bad:
             print("FAIL:", b)
