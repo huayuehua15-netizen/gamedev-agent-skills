@@ -46,11 +46,9 @@ jobs:
         run: python tools/check_scaffolds.py
 
       - name: Repo integrity (refs, encoding, versions, license)
-        # 失败时把输出写进 step summary：job 日志与 artifact 都要 admin 权限，
-        # 而 summary 可以通过公开 API 读到，便于定位（尤其在不熟悉的平台上）。
         # shell 必须显式指定 bash：Windows runner 默认是 pwsh，
-        # 下面的 set +e / $? / >> 都是 bash 语法，在 pwsh 下会直接报错，
-        # 那正是它只在 windows-latest 上失败的原因。
+        # 下面的 set +e / $? / >> 都是 bash 语法，在 pwsh 下会直接报错。
+        # 失败时把输出写进 step summary，便于在没有 admin 权限时通过 API 定位。
         shell: bash
         run: |
           set +e
@@ -60,13 +58,12 @@ jobs:
           if [ $rc -ne 0 ]; then
             {
               echo '### check_repo failed'
-              echo '`'
+              echo '```'
               cat repo.out
-              echo '`'
+              echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
           exit $rc
-
       - name: Usability (install paths, self-containment, scaffold isolation)
         run: python tools/check_usability.py
       - name: build.py runs and dist/ matches plugins/
