@@ -46,7 +46,22 @@ jobs:
         run: python tools/check_scaffolds.py
 
       - name: Repo integrity (refs, encoding, versions, license)
-        run: python tools/check_repo.py
+        # 失败时把输出写进 step summary：job 日志与 artifact 都要 admin 权限，
+        # 而 summary 可以通过公开 API 读到，便于定位（尤其在不熟悉的平台上）。
+        run: |
+          set +e
+          python tools/check_repo.py > repo.out 2>&1
+          rc=$?
+          cat repo.out
+          if [ $rc -ne 0 ]; then
+            {
+              echo '### check_repo failed'
+              echo '`'
+              cat repo.out
+              echo '`'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $rc
 
       - name: Usability (install paths, self-containment, scaffold isolation)
         run: python tools/check_usability.py
