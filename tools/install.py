@@ -42,6 +42,33 @@ def require_dist():
     return True
 
 
+def _looks_like_skill(p: Path) -> bool:
+    return (p / "SKILL.md").is_file()
+
+
+def guard_project_root(root: Path):
+    """拒绝把技能装进本仓库自身。
+
+    实际写入位置是 root/skills/game-dev/，所以要在**项目根**这一层判断，
+    早先只判断了最终 dest（plugins/skills/game-dev），漏掉了 plugins/ 本身。
+    开发时把 --path 指向 plugins/ 就会把技能平铺进去、覆盖源码结构。
+    """
+    root = root.resolve()
+    repo = ROOT.resolve()
+    try:
+        root.relative_to(repo)
+        inside = True
+    except ValueError:
+        inside = False
+
+    if inside:
+        print("[错误] 目标目录位于本仓库内部：%s" % root)
+        print("       安装会把技能写进源码树（%s/）。" % REL_SKILLS.as_posix())
+        print("       请指向你自己的项目目录，例如 /path/to/your-project")
+        return False
+    return True
+
+
 def install_skills(dest: Path):
     """把 dist/skills/<name>/ 逐个复制到 dest/。"""
     dest.mkdir(parents=True, exist_ok=True)
@@ -52,17 +79,22 @@ def install_skills(dest: Path):
             shutil.rmtree(target)
         shutil.copytree(skill, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         print("  + %s" % skill.name)
+    return 0
 
 
-def do_trae(path: Path):
+def do_trae(path: Path) -> int:
     print("安装到 Trae 技能目录：%s" % path)
-    install_skills(path)
+    return install_skills(path)
 
 
-def do_project(target: str, path: Path):
+def do_project(target: str, path: Path) -> int:
+    if not guard_project_root(path):
+        return 1
     dest = path / REL_SKILLS
     print("安装到项目：%s" % path)
-    install_skills(dest)
+    rc = install_skills(dest)
+    if rc != 0:
+        return rc
 
     if target == "cursor":
         rules_src = DIST / "cursor" / ".cursor" / "rules"
@@ -81,6 +113,7 @@ def do_project(target: str, path: Path):
         else:
             shutil.copy2(new, agents)
             print("  + AGENTS.md")
+    return 0
 
 
 def main() -> int:
@@ -116,12 +149,15 @@ def main() -> int:
 
     path = Path(args.path).expanduser().resolve()
     if args.target == "trae":
-        do_trae(path)
+        rc = do_trae(path)
     else:
         if not path.is_dir():
             print("[错误] 目标目录不存在：%s" % path)
             return 1
-        do_project(args.target, path)
+        rc = do_project(args.target, path)
+
+    if rc != 0:
+        return rc
 
     print("\n完成。")
     return 0

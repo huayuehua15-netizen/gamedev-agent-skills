@@ -45,6 +45,11 @@ jobs:
       - name: Scaffolds produce valid output
         run: python tools/check_scaffolds.py
 
+      - name: Repo integrity (refs, encoding, versions, license)
+        run: python tools/check_repo.py
+
+      - name: Usability (install paths, self-containment, scaffold isolation)
+        run: python tools/check_usability.py
       - name: build.py runs and dist/ matches plugins/
         run: python tools/check_dist.py
 
