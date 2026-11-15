@@ -48,6 +48,10 @@ jobs:
       - name: Repo integrity (refs, encoding, versions, license)
         # 失败时把输出写进 step summary：job 日志与 artifact 都要 admin 权限，
         # 而 summary 可以通过公开 API 读到，便于定位（尤其在不熟悉的平台上）。
+        # shell 必须显式指定 bash：Windows runner 默认是 pwsh，
+        # 下面的 set +e / $? / >> 都是 bash 语法，在 pwsh 下会直接报错，
+        # 那正是它只在 windows-latest 上失败的原因。
+        shell: bash
         run: |
           set +e
           python tools/check_repo.py > repo.out 2>&1
