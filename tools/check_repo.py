@@ -133,6 +133,10 @@ print(f"BLOCKER {len(blockers)}   WARN {len(warns)}")
 print("=" * 72)
 for b in blockers:
     print("[BLOCKER]", b)
+    # GitHub Actions 的 job 日志需要 admin 权限才能下载，所以把失败细节
+    # 以 ::error:: 注解输出，这样可以免认证通过 API 读到。
+    for line in str(b).splitlines()[:6]:
+        print(f"::error title=check_repo::{line[:900]}")
 for w in warns:
     print("[WARN]   ", w)
 if not blockers and not warns:

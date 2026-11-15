@@ -96,11 +96,14 @@ try:
         (proj / "Assets").mkdir(parents=True)
         (proj / "Packages").mkdir(parents=True)
         (proj / "Packages/manifest.json").write_text('{"dependencies":{}}', encoding="utf-8")
+        # encoding 必须显式指定：Windows 上 subprocess 默认用 GBK 解码子进程输出，
+        # 而脚手架会打印中文，缺这一行会在读取输出时抛 UnicodeDecodeError。
         subprocess.run([sys.executable,
                         str(ROOT / "plugins/unity-gameplay-dev/skills/unity-gameplay-dev/scripts/new_gameplay.py"),
                         "--out", str(proj / "Assets/Game"), "--namespace", "T" + dim,
                         "--dimension", dim],
-                       capture_output=True, timeout=120)
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=120)
     p2 = tmp / "2d/Assets/Game/Player"
     p3 = tmp / "3d/Assets/Game/Player"
     if p2.exists() and (p2 / "FirstPersonController.cs").exists():
