@@ -45,6 +45,8 @@ jobs:
       - name: Scaffolds produce valid output
         run: python tools/check_scaffolds.py
 
+      - name: Every printing script has a UTF-8 guard
+        run: python tools/check_encoding.py
       - name: Repo integrity (refs, encoding, versions, license)
         # shell 必须显式指定 bash（Windows runner 默认 pwsh）。
         # 失败时逐行用 ::error:: 输出，这个可通过公开 API 读到，
