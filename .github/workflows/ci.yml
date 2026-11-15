@@ -46,9 +46,9 @@ jobs:
         run: python tools/check_scaffolds.py
 
       - name: Repo integrity (refs, encoding, versions, license)
-        # shell 必须显式指定 bash：Windows runner 默认是 pwsh，
-        # 下面的 set +e / $? / >> 都是 bash 语法，在 pwsh 下会直接报错。
-        # 失败时把输出写进 step summary，便于在没有 admin 权限时通过 API 定位。
+        # shell 必须显式指定 bash（Windows runner 默认 pwsh）。
+        # 失败时逐行用 ::error:: 输出，这个可通过公开 API 读到，
+        # 而 job 日志与 artifact 都需要 admin 权限。
         shell: bash
         run: |
           set +e
@@ -56,12 +56,9 @@ jobs:
           rc=$?
           cat repo.out
           if [ $rc -ne 0 ]; then
-            {
-              echo '### check_repo failed'
-              echo '```'
-              cat repo.out
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "::error title=check_repo::$line"
+            done < repo.out
           fi
           exit $rc
       - name: Usability (install paths, self-containment, scaffold isolation)
